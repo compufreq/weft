@@ -57,7 +57,7 @@ services:
       - cargo-target:/app/target
 
   frontend:
-    image: node:22-alpine
+    image: node:26-alpine
     working_dir: /app
     command: ["sh", "-c", "npm install && npm run dev"]
     environment:
