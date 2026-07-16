@@ -59,6 +59,14 @@ docker run -d -p 8080:8080 \
 
 `WEFT_READ_ONLY=true` turns Weft into a safe viewer: browsing, search, and export work; anything mutating (adding instances, tenant changes, backups) is rejected with `403 read_only` and the UI shows a banner. Handy for giving a whole team visibility without handing out write access.
 
+:::note[There is intentionally no UI toggle]
+Read-only mode (like the auth token) is a **deployment-level** switch — it can only be changed by restarting the container without `WEFT_READ_ONLY`. If it were toggleable from the UI, anyone with browser access could disable it, which would defeat its purpose. Check a deployment's current state with `GET /api/v1/auth`:
+
+```json
+{ "auth_required": true, "authorized": true, "read_only": true }
+```
+:::
+
 ## Security notes
 
 - API keys and the auth token are held in memory, redacted in every API response, and never logged.
