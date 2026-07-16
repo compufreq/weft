@@ -22,9 +22,18 @@ Wait for the seeder to finish (`seeded: Article (25 objects), Product (multi-ten
 3. **It's SSR** — view page source: the table is in the HTML, no client JS required.
 4. **API directly** — `curl localhost:8180/api/v1/instances/local/schema`
 
-## Screenshots
+## Verification (Phase 0 gate)
 
-_(captured during the Preview UI/UX walkthrough — added at gate close)_
+Verified interactively in a browser against the containerized stack on 2026-07-16:
+
+- **Journeys**: instances overview → instance card → schema table (breadcrumb, property counts, vectorizer, multi-tenancy badge)
+- **Accessibility**: axe-core scan on `/` and `/i/local/schema` — zero violations
+- **Responsive**: 375px / 768px / desktop — no horizontal page overflow; wide tables scroll inside their own focusable region
+- **Themes**: dark verified live; light is the default style layer
+- **SSR**: `curl` of `/i/local/schema` contains the fully rendered table — no client JS required
+- **Console/network**: no application errors; all requests 200
+
+_Screenshot captures for the docs site land with the Pages setup in v0.2.0._
 
 ## What's next
 

@@ -4,8 +4,10 @@ FROM rust:1.92-slim-bookworm
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# hadolint ignore=DL3008
+# upgrade pulls Debian security patches (Trivy gate); DL3005 predates that practice.
+# hadolint ignore=DL3005,DL3008
 RUN apt-get update \
+    && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends curl ca-certificates pkg-config make git \
     && rm -rf /var/lib/apt/lists/*
 
