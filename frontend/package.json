@@ -4,13 +4,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vinxi dev --host 0.0.0.0 --port 3000",
+    "dev": "vinxi dev --host 0.0.0.0 --port 3100",
     "build": "vinxi build",
     "start": "vinxi start",
     "test": "vitest run",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write src"
+  },
+  "overrides": {
+    "h3": "^1.15.6"
   },
   "dependencies": {
     "@solidjs/router": "^0.15.3",

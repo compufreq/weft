@@ -23,6 +23,9 @@ allow = [
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"
+# Workspace-internal path dependencies (weft-core, weft-weaviate) have no
+# version requirement — that's fine, they're not from a registry.
+allow-wildcard-paths = true
 
 [sources]
 unknown-registry = "deny"

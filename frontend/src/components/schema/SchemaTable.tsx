@@ -16,7 +16,13 @@ export default function SchemaTable(props: { classes: ClassInfo[] }) {
         </p>
       }
     >
-      <div class="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
+      {/* tabindex + region role: keyboard users must be able to scroll wide tables */}
+      <div
+        tabindex="0"
+        role="region"
+        aria-label="Collections"
+        class="overflow-x-auto rounded-lg border border-zinc-200 focus-visible:outline-2 focus-visible:outline-weft-500 dark:border-zinc-800"
+      >
         <table class="w-full text-left text-sm">
           <thead class="bg-zinc-100 text-xs uppercase tracking-wide text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400">
             <tr>

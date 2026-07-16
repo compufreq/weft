@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: aquasecurity/trivy-action@0.28.0
+      - uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -46,7 +46,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build dev image
         run: docker build -f docker/dev/backend.dev.Dockerfile -t weft-backend-dev:ci .
-      - uses: aquasecurity/trivy-action@0.28.0
+      - uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: image
           image-ref: weft-backend-dev:ci
@@ -59,9 +59,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: hadolint/hadolint-action@v3.1.0
-        with:
-          recursive: true
+      # hadolint-action only matches files named exactly "Dockerfile";
+      # ours are *.Dockerfile — run hadolint directly instead.
+      - name: hadolint all *.Dockerfile files
+        run: |
+          docker run --rm -v "$PWD":/repo -w /repo hadolint/hadolint:latest-alpine \
+            sh -c 'find . -name "*.Dockerfile" -print | xargs -r hadolint'
 
   gitleaks:
     name: Secret scan

@@ -17,6 +17,9 @@ export default defineConfig({
           changeOrigin: true,
         },
       },
+      // NOTE: server.hmr options are not currently forwarded by vinxi to the
+      // client router (BUGS.md: BUG-001) — HMR websocket fails behind the
+      // Docker port mapping, so refresh manually after edits for now.
       watch: {
         // Windows bind mounts don't emit fs events.
         usePolling: true,

@@ -66,7 +66,9 @@ services:
       # Windows bind mounts don't emit fs events — poll instead.
       CHOKIDAR_USEPOLLING: "true"
     ports:
-      - "3100:3000"
+      # Internal port == published port so the default vite HMR websocket
+      # (same host:port as the page) works through the Docker mapping.
+      - "3100:3100"
     depends_on:
       - backend
     volumes:

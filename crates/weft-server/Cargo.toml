@@ -4,6 +4,9 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+# Deployed as a container image, never published to crates.io
+# (also lets cargo-deny accept the workspace path dependencies).
+publish = false
 
 [dependencies]
 anyhow = { workspace = true }
