@@ -23,7 +23,7 @@ Cursor-paginated object browser (virtualized), JSON detail drawer, BM25 / nearVe
 ### v0.4.0 — Multi-tenancy *(shipped 2026-07-16)*
 Tenant list/filter, HOT/COLD activation, per-tenant object counts, tenant-scoped explorer, bulk tenant operations.
 
-### v0.5.0 — Ops dashboard
+### v0.5.0 — Ops dashboard *(shipped 2026-07-16)*
 Node/shard health (live polling), index & queue status, backup create/restore (module-gated), Weaviate version & capability display.
 
 ### v0.6 – v0.9 — Hardening
