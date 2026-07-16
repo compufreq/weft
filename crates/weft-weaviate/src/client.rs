@@ -178,6 +178,59 @@ impl WeaviateClient {
         Self::decode(resp).await
     }
 
+    /// `POST /v1/schema/{class}/properties` — add a property to a collection.
+    pub async fn add_property(&self, class: &str, property: &Value) -> Result<Value, Error> {
+        let resp = self
+            .post(self.url(&format!("/v1/schema/{class}/properties"))?)
+            .json(property)
+            .send()
+            .await?;
+        Self::decode(resp).await
+    }
+
+    /// `GET /v1/aliases` — list collection aliases (Weaviate ≥ 1.32).
+    pub async fn aliases(&self) -> Result<Value, Error> {
+        let resp = self.get(self.url("/v1/aliases")?).send().await?;
+        Self::decode(resp).await
+    }
+
+    /// `POST /v1/aliases` — create an alias pointing at a collection.
+    pub async fn create_alias(&self, alias: &str, class: &str) -> Result<Value, Error> {
+        let resp = self
+            .post(self.url("/v1/aliases")?)
+            .json(&serde_json::json!({ "alias": alias, "class": class }))
+            .send()
+            .await?;
+        Self::decode(resp).await
+    }
+
+    /// `PUT /v1/aliases/{alias}` — repoint an alias at another collection.
+    pub async fn update_alias(&self, alias: &str, class: &str) -> Result<Value, Error> {
+        let resp = self
+            .put(self.url(&format!("/v1/aliases/{alias}"))?)
+            .json(&serde_json::json!({ "class": class }))
+            .send()
+            .await?;
+        Self::decode(resp).await
+    }
+
+    /// `DELETE /v1/aliases/{alias}` — remove an alias (the collection stays).
+    pub async fn delete_alias(&self, alias: &str) -> Result<(), Error> {
+        let resp = self
+            .delete(self.url(&format!("/v1/aliases/{alias}"))?)
+            .send()
+            .await?;
+        let status = resp.status();
+        if status.is_success() {
+            Ok(())
+        } else {
+            Err(Error::Status {
+                status,
+                body: resp.text().await.unwrap_or_default(),
+            })
+        }
+    }
+
     /// `DELETE /v1/schema/{class}` — drop a collection (destructive!).
     pub async fn delete_class(&self, class: &str) -> Result<(), Error> {
         let req = self.http.delete(self.url(&format!("/v1/schema/{class}"))?);

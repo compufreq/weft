@@ -39,6 +39,26 @@ pub fn app_with_proxy(state: AppState, ssr: Option<SsrProxy>) -> Router {
         )
         .route("/api/v1/instances/{id}", delete(api::instances::remove))
         .route("/api/v1/instances/{id}/meta", get(api::instances::meta))
+        .route(
+            "/api/v1/instances/{id}/collections",
+            post(api::collections::create),
+        )
+        .route(
+            "/api/v1/instances/{id}/collections/{class}",
+            delete(api::collections::delete),
+        )
+        .route(
+            "/api/v1/instances/{id}/collections/{class}/properties",
+            post(api::collections::add_property),
+        )
+        .route(
+            "/api/v1/instances/{id}/aliases",
+            get(api::aliases::list).post(api::aliases::create),
+        )
+        .route(
+            "/api/v1/instances/{id}/aliases/{alias}",
+            axum::routing::put(api::aliases::update).delete(api::aliases::delete),
+        )
         .route("/api/v1/instances/{id}/schema", get(api::schema::full))
         .route(
             "/api/v1/instances/{id}/schema/export",

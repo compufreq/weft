@@ -26,6 +26,7 @@ fn test_app() -> axum::Router {
         }],
         auth_token: None,
         read_only: false,
+        instances_file: None,
     };
     app(AppState::from_config(&config).expect("valid test config"))
 }
@@ -275,6 +276,7 @@ async fn unreachable_weaviate_is_502() {
         }],
         auth_token: None,
         read_only: false,
+        instances_file: None,
     };
     let app = app(AppState::from_config(&config).unwrap());
     let response = app

@@ -88,7 +88,7 @@ pub async fn add(
         .api_key
         .filter(|k| !k.is_empty())
         .map(SecretString::from);
-    let client = WeaviateClient::new(&body.url, api_key)
+    let client = WeaviateClient::new(&body.url, api_key.clone())
         .map_err(|e| ApiError::InvalidInput(format!("invalid url: {e}")))?;
 
     let instance = Instance {
@@ -96,6 +96,7 @@ pub async fn add(
         name,
         url: body.url,
         client,
+        api_key,
     };
     let added = state
         .add_instance(instance)

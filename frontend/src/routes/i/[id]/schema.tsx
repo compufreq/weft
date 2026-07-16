@@ -1,7 +1,10 @@
-import { createAsync, query, useParams, A } from "@solidjs/router";
-import { ErrorBoundary, Show } from "solid-js";
+import { createAsync, query, revalidate, useParams, A } from "@solidjs/router";
+import { createSignal, ErrorBoundary, onMount, Show } from "solid-js";
+import { useAuth } from "~/components/AuthGate";
+import AliasPanel from "~/components/schema/AliasPanel";
+import CollectionForm from "~/components/schema/CollectionForm";
 import SchemaTable from "~/components/schema/SchemaTable";
-import { api } from "~/lib/api";
+import { api, type AliasList } from "~/lib/api";
 
 const getSchema = query((instanceId: string) => api.schema(instanceId), "schema");
 
@@ -12,6 +15,22 @@ export const route = {
 export default function SchemaPage() {
   const params = useParams();
   const schema = createAsync(() => getSchema(params.id ?? ""));
+  const auth = useAuth();
+  const readOnly = () => auth?.status()?.read_only ?? false;
+
+  const [creating, setCreating] = createSignal(false);
+  const [aliases, setAliases] = createSignal<AliasList | null>(null);
+
+  const refreshAliases = async () => {
+    try {
+      setAliases(await api.aliases(params.id ?? ""));
+    } catch {
+      setAliases(null); // aliases are auxiliary — never block the schema page
+    }
+  };
+  onMount(() => void refreshAliases());
+
+  const classNames = () => schema()?.classes.map((c) => c.class) ?? [];
 
   return (
     <section aria-labelledby="schema-heading">
@@ -33,7 +52,16 @@ export default function SchemaPage() {
             details.
           </p>
         </div>
-        <div class="flex gap-2">
+        <div class="flex flex-wrap gap-2">
+          <Show when={!readOnly()}>
+            <button
+              type="button"
+              onClick={() => setCreating(true)}
+              class="rounded-lg bg-weft-600 px-3 py-2 text-sm font-medium text-white hover:bg-weft-700"
+            >
+              New collection
+            </button>
+          </Show>
           <a
             href={api.exportUrl(params.id ?? "")}
             download={`weft-schema-${params.id}.json`}
@@ -62,6 +90,19 @@ export default function SchemaPage() {
         </div>
       </div>
 
+      <Show when={creating()}>
+        <div class="mt-6">
+          <CollectionForm
+            onCreate={async (def) => {
+              await api.createCollection(params.id ?? "", def);
+              setCreating(false);
+              await revalidate(getSchema.keyFor(params.id ?? ""));
+            }}
+            onCancel={() => setCreating(false)}
+          />
+        </div>
+      </Show>
+
       <div class="mt-6">
         <ErrorBoundary
           fallback={(err) => (
@@ -79,6 +120,32 @@ export default function SchemaPage() {
           </Show>
         </ErrorBoundary>
       </div>
+
+      <Show when={aliases()}>
+        {(a) => (
+          <div class="mt-6">
+            <AliasPanel
+              supported={a().supported}
+              reason={a().reason}
+              aliases={a().aliases}
+              classes={classNames()}
+              readOnly={readOnly()}
+              onCreate={async (alias, cls) => {
+                await api.createAlias(params.id ?? "", alias, cls);
+                await refreshAliases();
+              }}
+              onRetarget={async (alias, cls) => {
+                await api.updateAlias(params.id ?? "", alias, cls);
+                await refreshAliases();
+              }}
+              onDelete={async (alias) => {
+                await api.deleteAlias(params.id ?? "", alias);
+                await refreshAliases();
+              }}
+            />
+          </div>
+        )}
+      </Show>
     </section>
   );
 }

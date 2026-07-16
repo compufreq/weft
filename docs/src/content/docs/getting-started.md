@@ -47,6 +47,7 @@ The image is published for **amd64 and arm64** (Apple Silicon, Raspberry Pi 5, G
 ## What you can do
 
 - **Browse schemas** — collections, properties, vectorizers, index config, multi-tenancy status
+- **Manage schemas** — create collections (guided form or raw JSON), add properties, delete collections behind a typed confirmation, manage collection **aliases** (Weaviate ≥ 1.32)
 - **Manage connections** — register multiple Weaviate instances at runtime
 - **Export & diff schemas** — one-click JSON download; compare two instances, or an instance against an earlier export
 - **Explore objects** — cursor-paginated browser with a JSON detail panel and streaming NDJSON export

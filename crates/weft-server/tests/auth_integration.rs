@@ -14,6 +14,7 @@ fn app_with(auth: Option<&str>, read_only: bool) -> axum::Router {
         instances: vec![],
         auth_token: auth.map(SecretString::from),
         read_only,
+        instances_file: None,
     };
     app(AppState::from_config(&config).unwrap())
 }
@@ -300,6 +301,12 @@ async fn read_only_allows_query_posts() {
         ("PUT", "/api/v1/instances/x/collections/C/objects/u-1"),
         ("DELETE", "/api/v1/instances/x/collections/C/objects/u-1"),
         ("POST", "/api/v1/instances/x/collections/C/import"),
+        ("POST", "/api/v1/instances/x/collections"),
+        ("DELETE", "/api/v1/instances/x/collections/C"),
+        ("POST", "/api/v1/instances/x/collections/C/properties"),
+        ("POST", "/api/v1/instances/x/aliases"),
+        ("PUT", "/api/v1/instances/x/aliases/a1"),
+        ("DELETE", "/api/v1/instances/x/aliases/a1"),
     ] {
         let (status, body, _) = send(&app, method, path, &[], Some(serde_json::json!({}))).await;
         assert_eq!(

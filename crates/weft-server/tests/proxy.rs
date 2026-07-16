@@ -17,6 +17,7 @@ fn state() -> AppState {
         instances: vec![],
         auth_token: None,
         read_only: false,
+        instances_file: None,
     };
     AppState::from_config(&config).unwrap()
 }

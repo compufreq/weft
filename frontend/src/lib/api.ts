@@ -173,6 +173,17 @@ export interface AggregateResult {
   groups_truncated?: boolean;
 }
 
+export interface AliasEntry {
+  alias: string;
+  class: string;
+}
+
+export interface AliasList {
+  supported: boolean;
+  aliases: AliasEntry[];
+  reason?: string;
+}
+
 export interface ImportReport {
   inserted: number;
   failed: number;
@@ -261,6 +272,42 @@ export const api = {
     postJson<{ results: SearchHit[] }>(
       `/api/v1/instances/${encodeURIComponent(instanceId)}/collections/${encodeURIComponent(className)}/search`,
       input,
+    ),
+  createCollection: (instanceId: string, classDef: Record<string, unknown>) =>
+    postJson<Record<string, unknown>>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/collections`,
+      classDef,
+    ),
+  deleteCollection: (instanceId: string, className: string) =>
+    fetchJson<void>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/collections/${encodeURIComponent(className)}`,
+      { method: "DELETE" },
+    ),
+  addProperty: (instanceId: string, className: string, property: Record<string, unknown>) =>
+    postJson<Record<string, unknown>>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/collections/${encodeURIComponent(className)}/properties`,
+      property,
+    ),
+  aliases: (instanceId: string) =>
+    fetchJson<AliasList>(`/api/v1/instances/${encodeURIComponent(instanceId)}/aliases`),
+  createAlias: (instanceId: string, alias: string, className: string) =>
+    postJson<unknown>(`/api/v1/instances/${encodeURIComponent(instanceId)}/aliases`, {
+      alias,
+      class: className,
+    }),
+  updateAlias: (instanceId: string, alias: string, className: string) =>
+    fetchJson<unknown>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/aliases/${encodeURIComponent(alias)}`,
+      {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ class: className }),
+      },
+    ),
+  deleteAlias: (instanceId: string, alias: string) =>
+    fetchJson<void>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/aliases/${encodeURIComponent(alias)}`,
+      { method: "DELETE" },
     ),
   createObject: (
     instanceId: string,

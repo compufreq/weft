@@ -41,8 +41,8 @@ Where-filter builder on the object browser and search, aggregations (counts + pe
 ### v0.10.0 — Data write path *(shipped 2026-07-16)*
 Object create / edit / delete from the UI, JSON/NDJSON batch import with per-item error reports — all blocked in read-only deployments (CSV import: v0.10.x follow-up).
 
-### v0.11.0 — Schema management & aliases
-Collection create (guided form + raw JSON), add property, collection delete behind confirmation, collection alias CRUD (Weaviate ≥1.32), persisted runtime instances (volume-backed).
+### v0.11.0 — Schema management & aliases *(shipped 2026-07-16)*
+Collection create (guided form + raw JSON), add property, collection delete behind typed confirmation, collection alias CRUD (Weaviate ≥1.32, graceful degradation below), persisted runtime instances (`WEFT_INSTANCES_FILE`).
 
 ### v0.12.0 — Ops depth
 RBAC viewer (users, roles, assignments — read-only surface over Weaviate RBAC), cluster statistics/metrics panel, vector-space visualization (2D projection of query results).

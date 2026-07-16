@@ -49,6 +49,7 @@ pub async fn capabilities(
         "version": meta.version,
         "modules": module_names,
         "backup_backends": backup_backends,
+        "aliases_supported": crate::api::aliases::version_at_least(&meta.version, 1, 32),
     })))
 }
 

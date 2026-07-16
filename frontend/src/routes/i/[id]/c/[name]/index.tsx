@@ -1,5 +1,7 @@
-import { A, createAsync, query, useParams } from "@solidjs/router";
+import { A, createAsync, query, revalidate, useNavigate, useParams } from "@solidjs/router";
 import { ErrorBoundary, Show } from "solid-js";
+import { useAuth } from "~/components/AuthGate";
+import { AddPropertyForm, DeleteCollection } from "~/components/schema/CollectionActions";
 import PropertyTable from "~/components/schema/PropertyTable";
 import { api } from "~/lib/api";
 
@@ -12,8 +14,11 @@ export const route = {
 
 export default function ClassDetailPage() {
   const params = useParams();
+  const navigate = useNavigate();
   const schema = createAsync(() => getSchema(params.id ?? ""));
   const cls = () => schema()?.classes.find((c) => c.class === params.name);
+  const auth = useAuth();
+  const readOnly = () => auth?.status()?.read_only ?? false;
 
   return (
     <section aria-labelledby="class-heading">
@@ -116,6 +121,16 @@ export default function ClassDetailPage() {
               <div class="mt-3">
                 <PropertyTable properties={c().properties} />
               </div>
+              <Show when={!readOnly()}>
+                <div class="mt-4">
+                  <AddPropertyForm
+                    onAdd={async (property) => {
+                      await api.addProperty(params.id ?? "", c().class, property);
+                      await revalidate(getSchema.keyFor(params.id ?? ""));
+                    }}
+                  />
+                </div>
+              </Show>
 
               <details class="mt-8">
                 <summary class="cursor-pointer text-sm font-medium text-weft-600 dark:text-weft-400">
@@ -125,6 +140,19 @@ export default function ClassDetailPage() {
                   {JSON.stringify(c(), null, 2)}
                 </pre>
               </details>
+
+              <Show when={!readOnly()}>
+                <div class="mt-8">
+                  <DeleteCollection
+                    collectionName={c().class}
+                    onDelete={async () => {
+                      await api.deleteCollection(params.id ?? "", c().class);
+                      await revalidate(getSchema.keyFor(params.id ?? ""));
+                      navigate(`/i/${params.id}/schema`);
+                    }}
+                  />
+                </div>
+              </Show>
             </>
           )}
         </Show>

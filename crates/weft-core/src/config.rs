@@ -38,6 +38,10 @@ pub struct Config {
     /// When true (`WEFT_READ_ONLY`), mutating API requests are rejected.
     #[serde(default)]
     pub read_only: bool,
+    /// When set (`WEFT_INSTANCES_FILE`), instances added at runtime are
+    /// persisted to this JSON file (mount a volume) and reloaded on start.
+    #[serde(default)]
+    pub instances_file: Option<String>,
 }
 
 impl Default for Config {
@@ -55,6 +59,7 @@ impl Default for Config {
             }],
             auth_token: None,
             read_only: false,
+            instances_file: None,
         }
     }
 }
@@ -103,6 +108,7 @@ mod tests {
             }],
             auth_token: Some(SecretString::from("guard-secret")),
             read_only: false,
+            instances_file: None,
         };
         let json = serde_json::to_string(&cfg).unwrap();
         assert!(!json.contains("super-secret"));

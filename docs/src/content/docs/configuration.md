@@ -14,6 +14,7 @@ Weft is zero-config by default: with no configuration at all it registers a sing
 | `WEFT_LISTEN`       | `0.0.0.0:8080`          | Address the server binds                       |
 | `WEFT_AUTH_TOKEN`   | — (open)                | When set, the API requires this token (UI prompts for it; API clients send `Authorization: Bearer …`) |
 | `WEFT_READ_ONLY`    | `false`                 | Reject all mutating requests (instance changes, tenants, backups) |
+| `WEFT_INSTANCES_FILE` | — (in-memory)         | Persist runtime-added instances to this JSON file (mount a volume) |
 | `RUST_LOG`          | `info`                  | Log level (`tracing` filter syntax)            |
 
 ## weft.yaml
@@ -38,7 +39,22 @@ Environment variables prefixed `WEFT_` override file values.
 
 ## Runtime instances
 
-Instances added through the UI (or `POST /api/v1/instances`) are **in-memory** — they reset when the container restarts. Put permanent instances in `weft.yaml`.
+Instances added through the UI (or `POST /api/v1/instances`) are **in-memory by default** — they reset when the container restarts. Two ways to make them permanent:
+
+- Put them in `weft.yaml` (recommended for fleet configs), or
+- Set `WEFT_INSTANCES_FILE=/data/instances.json` and mount a volume at `/data` — every runtime add/remove is persisted atomically and reloaded on start (v0.11+).
+
+```bash
+docker run -d -p 8080:8080 \
+  -e WEAVIATE_URL=http://weaviate:8080 \
+  -e WEFT_INSTANCES_FILE=/data/instances.json \
+  -v weft-data:/data \
+  ghcr.io/compufreq/weft:latest
+```
+
+:::caution[API keys are stored in the file]
+Persisted instances include their API keys in plain text (they must survive the restart) — the file deserves the same protection as `weft.yaml`. A corrupt file never stops the server; it just boots without runtime instances.
+:::
 
 ## Authentication (v0.6+)
 

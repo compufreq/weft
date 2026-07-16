@@ -42,7 +42,8 @@ export default function AddInstanceForm(props: { onAdded: () => void }) {
     >
       <h2 class="font-medium">Add instance</h2>
       <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-        In-memory until restart — put permanent instances in <code>weft.yaml</code>.
+        Survives restarts only if the deployment sets <code>WEFT_INSTANCES_FILE</code> —
+        otherwise put permanent instances in <code>weft.yaml</code>.
       </p>
 
       <div class="mt-3 space-y-3">
