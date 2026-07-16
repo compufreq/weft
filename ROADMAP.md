@@ -47,5 +47,8 @@ Collection create (guided form + raw JSON), add property, collection delete behi
 ### v0.12.0 — Ops depth *(shipped 2026-07-17)*
 RBAC viewer (roles, users, assignments — read-only, graceful when RBAC is off), Raft cluster-statistics panel, vector-space map (2D PCA projection with facet coloring, no external libs).
 
-### v1.0.0 — Stable
-Security review (threat model over the full mutation surface), `/api/v1` stability promise, complete documentation & walkthroughs.
+### v1.0.0 — Stable *(shipped 2026-07-17)*
+Security review (threat-model page over the full mutation surface), `/api/v1` stability promise, complete documentation.
+
+### Post-1.0 candidates
+1M-object performance pass · optional gRPC data path · CSV import · Or/nested filter groups · Prometheus metrics & historical charts · RBAC management · AI-assisted operations · open-core identity tier (per-user tokens, SSO/OIDC, audit log).

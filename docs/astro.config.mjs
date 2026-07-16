@@ -35,6 +35,7 @@ export default defineConfig({
             { label: "Getting started", slug: "getting-started" },
             { label: "Configuration", slug: "configuration" },
             { label: "Upgrading", slug: "upgrading" },
+            { label: "Security model", slug: "security" },
           ],
         },
         {

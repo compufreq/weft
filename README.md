@@ -2,7 +2,7 @@
 
 **The missing UI for Weaviate.** A zero-config, self-hosted web interface for browsing and managing [Weaviate](https://weaviate.io) vector databases.
 
-> ⚠️ **Early development** — Weft is pre-v1.0. APIs and UI are evolving; see the [roadmap](ROADMAP.md).
+> ✅ **Stable** — the `/api/v1` HTTP API is covered by a [stability commitment](https://compufreq.github.io/weft/upgrading/#compatibility-policy) as of v1.0.0. See the [roadmap](ROADMAP.md) for what's next.
 
 ## Why Weft?
 
@@ -28,13 +28,16 @@ Then open `http://localhost:8080`. One container serves the API and the UI — z
 - ✅ Multiple Weaviate instances — configured or added at runtime
 - ✅ Schema browser with per-collection detail views (properties, vectorizer, index config)
 - ✅ Schema export (JSON download) and structural **schema diff** (instance↔instance or instance↔file)
-- ✅ Object explorer — cursor pagination, JSON detail panel, streaming NDJSON export
-- ✅ Search — BM25 / nearVector / nearText / hybrid, with scores
+- ✅ Object explorer — cursor pagination, **where-filters, aggregations & facets**, JSON detail panel, streaming NDJSON export
+- ✅ Search — BM25 / nearVector / nearText / hybrid, with scores and filters
+- ✅ **Data editing** — create/edit/delete objects, batch JSON/NDJSON import with per-item error reports
+- ✅ **Schema management** — create collections, add properties, delete behind typed confirmation, collection **aliases** (≥1.32)
+- ✅ Raw **GraphQL console** per instance (query-only, safe in read-only mode)
 - ✅ First-class **multi-tenancy** — HOT/COLD activation, per-tenant counts, tenant-scoped browsing
-- ✅ Ops dashboard — node & shard health, capabilities, backup create/restore
-- ✅ Optional auth token (rate-limited, cookie sessions) and **read-only mode**
+- ✅ Ops dashboard — node & shard health, Raft statistics, RBAC visibility, capabilities, backup create/restore
+- ✅ **Vector map** — 2D PCA projection of your embedding space, facet-colored
+- ✅ Optional auth token (rate-limited, cookie sessions), **read-only mode**, persisted runtime instances
 - ✅ Server-side rendered — your data is in the HTML, no JS required
-- 🔜 Toward v1.0: security review, `/api/v1` stability commitment — see [ROADMAP.md](ROADMAP.md)
 
 ## Architecture
 

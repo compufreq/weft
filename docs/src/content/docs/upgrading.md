@@ -40,7 +40,7 @@ Pre-1.0, **pin at least the minor** (`ghcr.io/compufreq/weft:0.7`) in anything y
 ## Compatibility policy
 
 - **Versioning is [SemVer](https://semver.org)**. Pre-1.0, each feature phase lands as a minor (`0.x.0`) and fixes as patches (`0.x.y`); minors may contain breaking changes, and every one is called out in the [release notes](https://github.com/compufreq/weft/releases).
-- **The HTTP API is versioned under `/api/v1`.** From v1.0.0 it is a stability commitment: endpoints and response shapes only gain fields, never lose or change them, within a major.
+- **The HTTP API is versioned under `/api/v1` and stable as of v1.0.0**: within the 1.x major, endpoints and response shapes only gain fields — nothing is removed or changed incompatibly. Anything breaking waits for `/api/v2`.
 - **Weaviate support:** the latest two Weaviate minor lines are tested in CI; older versions (back to 1.30) work best-effort — features a given Weaviate can't serve (e.g. backup listing pre-1.31) degrade gracefully instead of erroring.
 
 ## Checking what you run

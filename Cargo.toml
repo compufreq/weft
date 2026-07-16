@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/weft-core", "crates/weft-weaviate", "crates/weft-server", "crates/xtask"]
 
 [workspace.package]
-version = "0.12.0"
+version = "1.0.0"
 edition = "2021"
 license = "AGPL-3.0-only"
 repository = "https://github.com/compufreq/weft"
