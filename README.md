@@ -1,0 +1,62 @@
+# Weft
+
+**The missing UI for Weaviate.** A zero-config, self-hosted web interface for browsing and managing [Weaviate](https://weaviate.io) vector databases.
+
+> ⚠️ **Early development** — Weft is pre-v1.0. APIs and UI are evolving; see the [roadmap](ROADMAP.md).
+
+## Why Weft?
+
+If you self-host Weaviate, you get raw APIs and nothing else — the official console targets Weaviate Cloud, and the alternatives are IDE extensions or thin wrappers. Weft is:
+
+- **Zero-config** — one container next to your Weaviate, open your browser, done
+- **Web-based** — usable by everyone on the team, not just people with VS Code
+- **Weaviate-deep** — multi-tenancy, hybrid search, node health as first-class features, not afterthoughts
+
+## Quickstart
+
+```bash
+docker run -d -p 8080:8080 -e WEAVIATE_URL=http://your-weaviate:8080 ghcr.io/compufreq/weft:latest
+```
+
+Then open `http://localhost:8080`. *(Image published from v0.2.0 — until then, build from source below.)*
+
+## Features (Phase 0 — walking skeleton)
+
+- ✅ Connect to a self-hosted Weaviate instance
+- ✅ Browse collections/schema (server-side rendered)
+- 🔜 Schema export & diff · object explorer · BM25/vector/hybrid search · tenant management · ops dashboard — see [ROADMAP.md](ROADMAP.md)
+
+## Architecture
+
+- **Backend:** Rust ([axum](https://github.com/tokio-rs/axum)) — acts as an aggregating proxy; your browser never talks to Weaviate directly
+- **Client:** `weft-weaviate`, a from-scratch Rust client for the Weaviate REST/GraphQL APIs
+- **Frontend:** [SolidStart](https://start.solidjs.com) with SSR, Tailwind CSS v4, Motion One animations
+- **Everything runs in Docker** — dev, tests, and production
+
+## Development
+
+Requires only Docker (no local Rust/Node needed — everything runs in containers):
+
+```bash
+docker compose -f compose.dev.yaml up
+```
+
+| Service | Host port | What |
+|---|---|---|
+| frontend | 3100 | SolidStart dev server (HMR) |
+| backend | 8180 | Rust API |
+| weaviate | 8181 | Weaviate 1.37 with seeded demo data |
+
+Run tests: see [Makefile](Makefile) targets (`make test`, `make lint`, `make security`).
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Conventional commits required.
+
+## License
+
+[AGPL-3.0](LICENSE)
+
+---
+
+*Weft is an independent open-source project and is **not affiliated with, endorsed by, or sponsored by Weaviate B.V.** "Weaviate" is a trademark of Weaviate B.V.*

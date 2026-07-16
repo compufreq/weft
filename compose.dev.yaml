@@ -1,0 +1,80 @@
+# Weft dev stack — everything runs in containers; the host needs only Docker.
+#   docker compose -f compose.dev.yaml up
+# Host ports: frontend :3100 · backend :8180 · weaviate :8181
+# (offset to avoid clashing with other local stacks on 3000/8080/8081)
+name: weft-dev
+
+services:
+  weaviate:
+    image: cr.weaviate.io/semitechnologies/weaviate:1.37.2
+    command: ["--host", "0.0.0.0", "--port", "8080", "--scheme", "http"]
+    environment:
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: /var/lib/weaviate
+      DEFAULT_VECTORIZER_MODULE: none
+      ENABLE_MODULES: ""
+      QUERY_DEFAULTS_LIMIT: "25"
+      CLUSTER_HOSTNAME: node1
+    ports:
+      - "8181:8080"
+    volumes:
+      - weaviate-data:/var/lib/weaviate
+
+  # One-shot: seeds demo collections (Article + multi-tenant Product).
+  # Waits for Weaviate readiness itself (xtask polls /.well-known/ready).
+  seed:
+    build:
+      context: .
+      dockerfile: docker/dev/backend.dev.Dockerfile
+    command: ["cargo", "run", "-p", "xtask", "--", "seed"]
+    environment:
+      WEAVIATE_URL: http://weaviate:8080
+      CARGO_TERM_COLOR: always
+    depends_on:
+      - weaviate
+    volumes:
+      - .:/app
+      - cargo-registry:/usr/local/cargo/registry
+      - cargo-target:/app/target
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/dev/backend.dev.Dockerfile
+    command: ["cargo", "watch", "-x", "run -p weft-server"]
+    environment:
+      WEAVIATE_URL: http://weaviate:8080
+      RUST_LOG: info,weft_server=debug
+      CARGO_TERM_COLOR: always
+    ports:
+      - "8180:8080"
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    volumes:
+      - .:/app
+      - cargo-registry:/usr/local/cargo/registry
+      - cargo-target:/app/target
+
+  frontend:
+    image: node:22-alpine
+    working_dir: /app
+    command: ["sh", "-c", "npm install && npm run dev"]
+    environment:
+      # Vite dev-server proxy target for /api (container-to-container).
+      WEFT_API_URL: http://backend:8080
+      # Windows bind mounts don't emit fs events — poll instead.
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "3100:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - node-modules:/app/node_modules
+
+volumes:
+  weaviate-data:
+  cargo-registry:
+  cargo-target:
+  node-modules:

@@ -1,0 +1,40 @@
+# --- Local governance files (session state, never committed) ---
+MEMORY.md
+SCOPE.md
+TASKS.md
+BUGS.md
+TESTS.md
+HANDOVER.md
+
+# --- Rust ---
+target/
+**/*.rs.bk
+
+# --- Node / frontend ---
+node_modules/
+frontend/.output/
+frontend/.vinxi/
+frontend/dist/
+*.tsbuildinfo
+
+# --- Docs site ---
+docs/dist/
+docs/.astro/
+
+# --- Env / secrets ---
+.env
+.env.*
+!.env.example
+weft.yaml
+!weft.example.yaml
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# --- Logs / temp ---
+*.log
+.cache/

@@ -1,0 +1,17 @@
+# Weft configuration example.
+# Copy to `weft.yaml` next to the binary (or mount into the container at /app/weft.yaml).
+# Everything here can also be set via WEFT_* environment variables,
+# and with NO config at all Weft connects to $WEAVIATE_URL (default http://weaviate:8080).
+
+listen: "0.0.0.0:8080"
+
+instances:
+  - id: local
+    name: Local Weaviate
+    url: http://weaviate:8080
+    # api_key: "sk-..."   # optional; sent as a Bearer token
+
+  # - id: staging
+  #   name: Staging cluster
+  #   url: https://weaviate.staging.example.com
+  #   api_key: "sk-..."

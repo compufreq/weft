@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+@theme {
+  /* Weft brand accent — indigo family, works in light and dark. */
+  --color-weft-50: oklch(0.96 0.02 285);
+  --color-weft-400: oklch(0.68 0.16 285);
+  --color-weft-500: oklch(0.6 0.19 285);
+  --color-weft-600: oklch(0.53 0.21 285);
+  --color-weft-700: oklch(0.46 0.2 285);
+}
