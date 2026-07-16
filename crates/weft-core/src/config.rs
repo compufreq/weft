@@ -31,6 +31,13 @@ pub struct Config {
     pub listen: String,
     /// Configured Weaviate instances.
     pub instances: Vec<InstanceConfig>,
+    /// When set (`WEFT_AUTH_TOKEN`), every `/api` request must present this
+    /// token (Bearer header or session cookie). Never serialized.
+    #[serde(default, skip_serializing)]
+    pub auth_token: Option<SecretString>,
+    /// When true (`WEFT_READ_ONLY`), mutating API requests are rejected.
+    #[serde(default)]
+    pub read_only: bool,
 }
 
 impl Default for Config {
@@ -46,6 +53,8 @@ impl Default for Config {
                     .ok()
                     .map(SecretString::from),
             }],
+            auth_token: None,
+            read_only: false,
         }
     }
 }
@@ -92,8 +101,14 @@ mod tests {
                 url: "http://w:8080".into(),
                 api_key: Some(SecretString::from("super-secret")),
             }],
+            auth_token: Some(SecretString::from("guard-secret")),
+            read_only: false,
         };
         let json = serde_json::to_string(&cfg).unwrap();
         assert!(!json.contains("super-secret"));
+        assert!(
+            !json.contains("guard-secret"),
+            "auth token never serialized"
+        );
     }
 }

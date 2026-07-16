@@ -1,5 +1,5 @@
 import { A, createAsync, query, revalidate } from "@solidjs/router";
-import { For, Show } from "solid-js";
+import { ErrorBoundary, For, Show } from "solid-js";
 import { Motion } from "solid-motionone";
 import AddInstanceForm from "~/components/instances/AddInstanceForm";
 import { api } from "~/lib/api";
@@ -29,6 +29,9 @@ export default function Home() {
       </p>
 
       <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {/* A 401 during SSR preload must not crash the shell — the AuthGate
+            overlay handles authentication client-side. */}
+        <ErrorBoundary fallback={<></>}>
         <Show when={instances()}>
           <For each={instances()}>
             {(instance, i) => (
@@ -64,6 +67,7 @@ export default function Home() {
             )}
           </For>
         </Show>
+        </ErrorBoundary>
 
         <AddInstanceForm onAdded={() => void refresh()} />
       </div>

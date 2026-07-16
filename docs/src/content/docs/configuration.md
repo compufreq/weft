@@ -12,6 +12,8 @@ Weft is zero-config by default: with no configuration at all it registers a sing
 | `WEAVIATE_URL`      | `http://weaviate:8080`  | URL of the default (`local`) instance          |
 | `WEAVIATE_API_KEY`  | —                       | Bearer token for the default instance          |
 | `WEFT_LISTEN`       | `0.0.0.0:8080`          | Address the server binds                       |
+| `WEFT_AUTH_TOKEN`   | — (open)                | When set, the API requires this token (UI prompts for it; API clients send `Authorization: Bearer …`) |
+| `WEFT_READ_ONLY`    | `false`                 | Reject all mutating requests (instance changes, tenants, backups) |
 | `RUST_LOG`          | `info`                  | Log level (`tracing` filter syntax)            |
 
 ## weft.yaml
@@ -38,7 +40,26 @@ Environment variables prefixed `WEFT_` override file values.
 
 Instances added through the UI (or `POST /api/v1/instances`) are **in-memory** — they reset when the container restarts. Put permanent instances in `weft.yaml`.
 
+## Authentication (v0.6+)
+
+Set `WEFT_AUTH_TOKEN` to protect the API:
+
+```bash
+docker run -d -p 8080:8080 \
+  -e WEAVIATE_URL=http://weaviate:8080 \
+  -e WEFT_AUTH_TOKEN=$(openssl rand -hex 24) \
+  ghcr.io/compufreq/weft:latest
+```
+
+- **Browsers** get a token prompt on first visit; the token is exchanged for an HttpOnly, SameSite=Strict session cookie (7 days).
+- **API clients** send `Authorization: Bearer <token>`.
+- `/healthz` and `/readyz` stay open for orchestrators.
+
+## Read-only mode
+
+`WEFT_READ_ONLY=true` turns Weft into a safe viewer: browsing, search, and export work; anything mutating (adding instances, tenant changes, backups) is rejected with `403 read_only` and the UI shows a banner. Handy for giving a whole team visibility without handing out write access.
+
 ## Security notes
 
-- API keys are held in memory, redacted in every API response (`api_key` never appears), and never logged.
-- Weft is designed to run on a trusted network next to Weaviate. It does not add its own authentication yet (optional UI auth token is planned for v0.6) — don't expose it directly to the public internet before then.
+- API keys and the auth token are held in memory, redacted in every API response, and never logged.
+- Weft serves plain HTTP — put TLS in front of it (reverse proxy / ingress) before crossing untrusted networks.

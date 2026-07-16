@@ -15,6 +15,8 @@ fn state() -> AppState {
     let config = Config {
         listen: "0.0.0.0:0".into(),
         instances: vec![],
+        auth_token: None,
+        read_only: false,
     };
     AppState::from_config(&config).unwrap()
 }

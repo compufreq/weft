@@ -4,7 +4,7 @@
  * Same-origin everywhere: in the browser we fetch relative URLs; during SSR we
  * need an absolute URL to the backend container (`WEFT_INTERNAL_API`).
  */
-import { isServer } from "solid-js/web";
+import { getRequestEvent, isServer } from "solid-js/web";
 
 export interface InstanceSummary {
   id: string;
@@ -49,6 +49,14 @@ export class ApiError extends Error {
 }
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
+  // During SSR, forward the browser's cookies so auth-enabled deployments can
+  // server-render authenticated data.
+  if (isServer) {
+    const cookie = getRequestEvent()?.request.headers.get("cookie");
+    if (cookie) {
+      init = { ...init, headers: { ...(init?.headers as object), cookie } };
+    }
+  }
   const res = await fetch(`${base()}${path}`, init);
   if (!res.ok) {
     let message = `Request failed with status ${res.status}`;
@@ -240,7 +248,7 @@ export const api = {
       `/api/v1/instances/${encodeURIComponent(instanceId)}/capabilities`,
     ),
   backups: (instanceId: string, backend: string) =>
-    fetchJson<{ backups: Backup[] }>(
+    fetchJson<{ backups: Backup[]; list_supported?: boolean }>(
       `/api/v1/instances/${encodeURIComponent(instanceId)}/backups/${encodeURIComponent(backend)}`,
     ),
   createBackup: (instanceId: string, backend: string, id?: string) =>

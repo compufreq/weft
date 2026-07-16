@@ -1,6 +1,7 @@
 //! Application state: the registry of configured Weaviate instances.
 
 use dashmap::DashMap;
+use secrecy::SecretString;
 use std::sync::Arc;
 use weft_core::Config;
 use weft_weaviate::WeaviateClient;
@@ -19,12 +20,20 @@ pub struct Instance {
 #[derive(Debug, Clone, Default)]
 pub struct AppState {
     instances: Arc<DashMap<String, Arc<Instance>>>,
+    /// When set, the API guard requires this token (Bearer or cookie).
+    pub auth_token: Option<SecretString>,
+    /// When true, mutating API requests are rejected.
+    pub read_only: bool,
 }
 
 impl AppState {
     /// Build the registry from configuration.
     pub fn from_config(config: &Config) -> Result<Self, weft_weaviate::Error> {
-        let state = Self::default();
+        let state = Self {
+            auth_token: config.auth_token.clone(),
+            read_only: config.read_only,
+            ..Self::default()
+        };
         for ic in &config.instances {
             let client = WeaviateClient::new(&ic.url, ic.api_key.clone())?;
             state.instances.insert(

@@ -95,8 +95,16 @@ pub async fn backups_list(
         .ok_or_else(|| ApiError::InstanceNotFound(id))?;
     path_segment(&backend)?;
     ensure_backend_enabled(&instance, &backend).await?;
-    let list = instance.client.backups(&backend).await?;
-    Ok(Json(json!({ "backups": list })))
+    // Older Weaviate (< 1.31) has no list endpoint — degrade, don't 502.
+    match instance.client.backups(&backend).await {
+        Ok(list) => Ok(Json(json!({ "backups": list, "list_supported": true }))),
+        Err(weft_weaviate::Error::Status { status, body })
+            if status.is_server_error() && body.contains("not implemented") =>
+        {
+            Ok(Json(json!({ "backups": [], "list_supported": false })))
+        }
+        Err(err) => Err(err.into()),
+    }
 }
 
 #[derive(Debug, Deserialize)]

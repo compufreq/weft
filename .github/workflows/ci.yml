@@ -37,8 +37,13 @@ jobs:
       - run: cargo nextest run --workspace --lib --bins
 
   rust-integration:
-    name: Rust integration tests (real Weaviate)
+    name: Rust integration tests (Weaviate ${{ matrix.weaviate }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Support policy: latest minor tested + best-effort floor.
+        weaviate: ["1.30.1", "1.37.2"]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -57,7 +62,7 @@ jobs:
             -e ENABLE_MODULES=backup-filesystem \
             -e BACKUP_FILESYSTEM_PATH=/var/lib/weaviate/backups \
             -e CLUSTER_HOSTNAME=node1 \
-            cr.weaviate.io/semitechnologies/weaviate:1.37.2 \
+            cr.weaviate.io/semitechnologies/weaviate:${{ matrix.weaviate }} \
             --host 0.0.0.0 --port 8080 --scheme http
       - name: Seed demo data
         run: cargo run -p xtask -- seed

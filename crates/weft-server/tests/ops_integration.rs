@@ -22,6 +22,8 @@ fn test_app() -> axum::Router {
             url: weaviate_url(),
             api_key: None,
         }],
+        auth_token: None,
+        read_only: false,
     };
     app(AppState::from_config(&config).expect("valid test config"))
 }
@@ -121,13 +123,18 @@ async fn backup_create_completes_and_lists() {
 
     let (status, list) = request("GET", "/api/v1/instances/local/backups/filesystem", None).await;
     assert_eq!(status, StatusCode::OK);
-    let ids: Vec<&str> = list["backups"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .filter_map(|b| b["id"].as_str())
-        .collect();
-    assert!(ids.contains(&id.as_str()), "created backup listed: {list}");
+    if list["list_supported"] == true {
+        let ids: Vec<&str> = list["backups"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|b| b["id"].as_str())
+            .collect();
+        assert!(ids.contains(&id.as_str()), "created backup listed: {list}");
+    } else {
+        // Weaviate < 1.31: listing unsupported — Weft degrades cleanly.
+        assert_eq!(list["backups"], serde_json::json!([]));
+    }
 
     // Restore is an async job. With the classes still present it is accepted
     // (202) and then FAILS safely — proving the restore path is wired without

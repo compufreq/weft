@@ -29,11 +29,13 @@ export default function OpsPage() {
     }
   };
 
+  const [listSupported, setListSupported] = createSignal(true);
   const refreshBackups = async () => {
     if (!backend()) return;
     try {
       const res = await api.backups(instanceId(), backend());
       setBackups(res.backups ?? []);
+      setListSupported(res.list_supported !== false);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -112,18 +114,32 @@ export default function OpsPage() {
       </div>
 
       <Show when={caps()}>
-        {(c) => (
-          <p class="mt-1 flex flex-wrap items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
-            Weaviate <code class="text-xs">{c().version}</code>
-            <For each={c().modules}>
-              {(m) => (
-                <span class="rounded-full bg-zinc-100 px-2 py-0.5 text-xs dark:bg-zinc-800">
-                  {m}
-                </span>
-              )}
-            </For>
-          </p>
-        )}
+        {(c) => {
+          const [showAll, setShowAll] = createSignal(false);
+          const visible = () => (showAll() ? c().modules : c().modules.slice(0, 8));
+          const hidden = () => c().modules.length - 8;
+          return (
+            <p class="mt-1 flex flex-wrap items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+              Weaviate <code class="text-xs">{c().version}</code>
+              <For each={visible()}>
+                {(m) => (
+                  <span class="rounded-full bg-zinc-100 px-2 py-0.5 text-xs dark:bg-zinc-800">
+                    {m}
+                  </span>
+                )}
+              </For>
+              <Show when={hidden() > 0}>
+                <button
+                  type="button"
+                  onClick={() => setShowAll(!showAll())}
+                  class="rounded-full border border-zinc-300 px-2 py-0.5 text-xs font-medium hover:border-weft-400 dark:border-zinc-700 dark:hover:border-weft-500"
+                >
+                  {showAll() ? "show fewer" : `+${hidden()} more`}
+                </button>
+              </Show>
+            </p>
+          );
+        }}
       </Show>
 
       <Show when={error()}>
@@ -184,6 +200,12 @@ export default function OpsPage() {
             </button>
           </div>
         </div>
+        <Show when={!listSupported()}>
+          <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+            This Weaviate version can't list existing backups (added in 1.31) — creating
+            backups still works.
+          </p>
+        </Show>
         <div class="mt-3">
           <BackupsTable backups={backups()} onRestore={(b) => void restoreBackup(b)} />
         </div>

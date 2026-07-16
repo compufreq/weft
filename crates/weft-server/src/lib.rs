@@ -28,6 +28,8 @@ pub fn app_with_proxy(state: AppState, ssr: Option<SsrProxy>) -> Router {
     let router = Router::new()
         .route("/healthz", get(api::health::healthz))
         .route("/readyz", get(api::health::readyz))
+        .route("/api/v1/auth", get(api::auth::status))
+        .route("/api/v1/auth/session", post(api::auth::session))
         .route(
             "/api/v1/instances",
             get(api::instances::list).post(api::instances::add),
@@ -82,6 +84,10 @@ pub fn app_with_proxy(state: AppState, ssr: Option<SsrProxy>) -> Router {
         .layer(CompressionLayer::new())
         // NOTE: no server-side TimeoutLayer needed — upstream calls are already
         // bounded by the reqwest client timeouts (connect 5s, total 30s).
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            api::auth::guard,
+        ))
         .with_state(state);
 
     match ssr {

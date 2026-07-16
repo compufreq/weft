@@ -178,6 +178,25 @@ impl WeaviateClient {
         Self::decode(resp).await
     }
 
+    /// `DELETE /v1/schema/{class}` — drop a collection (destructive!).
+    pub async fn delete_class(&self, class: &str) -> Result<(), Error> {
+        let req = self.http.delete(self.url(&format!("/v1/schema/{class}"))?);
+        let req = match &self.api_key {
+            Some(key) => req.bearer_auth(key.expose_secret()),
+            None => req,
+        };
+        let resp = req.send().await?;
+        let status = resp.status();
+        if status.is_success() {
+            Ok(())
+        } else {
+            Err(Error::Status {
+                status,
+                body: resp.text().await.unwrap_or_default(),
+            })
+        }
+    }
+
     /// `GET /v1/nodes?output=verbose` — cluster node and shard health.
     pub async fn nodes(&self) -> Result<Value, Error> {
         let mut url = self.url("/v1/nodes")?;

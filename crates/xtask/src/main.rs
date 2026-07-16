@@ -13,8 +13,86 @@ async fn main() -> Result<()> {
     let cmd = std::env::args().nth(1).unwrap_or_default();
     match cmd.as_str() {
         "seed" => seed().await,
-        other => bail!("unknown xtask `{other}`. Available: seed"),
+        "seed-perf" => {
+            let count: usize = std::env::args()
+                .nth(2)
+                .and_then(|n| n.parse().ok())
+                .unwrap_or(100_000);
+            seed_perf(count).await
+        }
+        "unseed-perf" => unseed_perf().await,
+        other => bail!("unknown xtask `{other}`. Available: seed, seed-perf [count], unseed-perf"),
     }
+}
+
+/// Seed a large `PerfDoc` collection for performance testing.
+async fn seed_perf(count: usize) -> Result<()> {
+    let url = std::env::var("WEAVIATE_URL").unwrap_or_else(|_| "http://weaviate:8080".into());
+    let client = WeaviateClient::new(&url, None).context("invalid WEAVIATE_URL")?;
+
+    let schema = client.schema().await?;
+    if !schema.classes.iter().any(|c| c.class == "PerfDoc") {
+        client
+            .create_class(&json!({
+                "class": "PerfDoc",
+                "description": "Synthetic perf-test documents",
+                "vectorizer": "none",
+                "properties": [
+                    { "name": "title", "dataType": ["text"] },
+                    { "name": "body", "dataType": ["text"] },
+                    { "name": "bucket", "dataType": ["int"] }
+                ]
+            }))
+            .await
+            .context("creating PerfDoc class")?;
+    }
+
+    const BATCH: usize = 1000;
+    let words = [
+        "alpha", "beta", "gamma", "delta", "vector", "search", "index", "shard",
+    ];
+    let started = std::time::Instant::now();
+    for start in (0..count).step_by(BATCH) {
+        let objects: Vec<_> = (start..(start + BATCH).min(count))
+            .map(|i| {
+                let w = words[i % words.len()];
+                json!({
+                    "class": "PerfDoc",
+                    "properties": {
+                        "title": format!("PerfDoc {i} about {w}"),
+                        "body": format!("Synthetic body {i}: {w} {w2} content for load testing.", w2 = words[(i / 7) % words.len()]),
+                        "bucket": (i % 100) as i64
+                    },
+                    "vector": (0..8).map(|d| ((i * 13 + d * 5) % 1000) as f64 / 1000.0).collect::<Vec<f64>>()
+                })
+            })
+            .collect();
+        client
+            .batch_objects(&objects)
+            .await
+            .with_context(|| format!("batch at offset {start}"))?;
+        if start % 10_000 == 0 {
+            println!("seeded {start}/{count} ({:.0?} elapsed)", started.elapsed());
+        }
+    }
+    println!(
+        "seed-perf done: {count} objects in {:.1?} ({:.0} obj/s)",
+        started.elapsed(),
+        count as f64 / started.elapsed().as_secs_f64()
+    );
+    Ok(())
+}
+
+/// Drop the perf-test collection.
+async fn unseed_perf() -> Result<()> {
+    let url = std::env::var("WEAVIATE_URL").unwrap_or_else(|_| "http://weaviate:8080".into());
+    let client = WeaviateClient::new(&url, None).context("invalid WEAVIATE_URL")?;
+    client
+        .delete_class("PerfDoc")
+        .await
+        .context("deleting PerfDoc")?;
+    println!("PerfDoc dropped");
+    Ok(())
 }
 
 async fn seed() -> Result<()> {

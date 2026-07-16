@@ -24,6 +24,8 @@ fn test_app() -> axum::Router {
             url: weaviate_url(),
             api_key: None,
         }],
+        auth_token: None,
+        read_only: false,
     };
     app(AppState::from_config(&config).expect("valid test config"))
 }
@@ -271,6 +273,8 @@ async fn unreachable_weaviate_is_502() {
             url: "http://127.0.0.1:1".into(), // nothing listens here
             api_key: None,
         }],
+        auth_token: None,
+        read_only: false,
     };
     let app = app(AppState::from_config(&config).unwrap());
     let response = app

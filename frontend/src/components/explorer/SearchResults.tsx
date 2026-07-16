@@ -35,7 +35,14 @@ export default function SearchResults(props: {
                     #{i() + 1} · <code>{hit.id.slice(0, 8)}…</code>
                   </span>
                   <span class="flex gap-2">
-                    <Show when={hit.score !== null && hit.score !== undefined}>
+                    {/* On pure vector searches Weaviate reports score 0 — distance is the signal, so hide the noise. */}
+                    <Show
+                      when={
+                        hit.score !== null &&
+                        hit.score !== undefined &&
+                        !(hit.score === 0 && hit.distance !== null && hit.distance !== undefined)
+                      }
+                    >
                       <span class="rounded-full bg-weft-50 px-2 py-0.5 text-xs font-medium text-weft-700 dark:bg-weft-700/20 dark:text-weft-400">
                         score {hit.score?.toFixed(4)}
                       </span>
