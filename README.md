@@ -22,14 +22,19 @@ Then open `http://localhost:8080`. One container serves the API and the UI — z
 
 📖 **Docs: [compufreq.github.io/weft](https://compufreq.github.io/weft/)**
 
-## Features (v0.2)
+## Features
 
-- ✅ Zero-config all-in-one container
+- ✅ Zero-config all-in-one container (amd64 + arm64)
 - ✅ Multiple Weaviate instances — configured or added at runtime
 - ✅ Schema browser with per-collection detail views (properties, vectorizer, index config)
 - ✅ Schema export (JSON download) and structural **schema diff** (instance↔instance or instance↔file)
+- ✅ Object explorer — cursor pagination, JSON detail panel, streaming NDJSON export
+- ✅ Search — BM25 / nearVector / nearText / hybrid, with scores
+- ✅ First-class **multi-tenancy** — HOT/COLD activation, per-tenant counts, tenant-scoped browsing
+- ✅ Ops dashboard — node & shard health, capabilities, backup create/restore
+- ✅ Optional auth token (rate-limited, cookie sessions) and **read-only mode**
 - ✅ Server-side rendered — your data is in the HTML, no JS required
-- 🔜 Object explorer · BM25/vector/hybrid search · tenant management · ops dashboard — see [ROADMAP.md](ROADMAP.md)
+- 🔜 Toward v1.0: security review, `/api/v1` stability commitment — see [ROADMAP.md](ROADMAP.md)
 
 ## Architecture
 

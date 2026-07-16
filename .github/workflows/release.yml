@@ -9,12 +9,22 @@ permissions:
   packages: write
 
 jobs:
-  publish:
-    runs-on: ubuntu-latest
+  # Build each architecture natively (QEMU cross-builds of the musl Rust
+  # stage are ~10x slower); push by digest, merge into one manifest below.
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - platform: linux/amd64
+            arch: amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # git-cliff needs full history
 
       - name: Verify tag matches workspace version
         run: |
@@ -33,6 +43,54 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/allinone.Dockerfile
+          platforms: ${{ matrix.platform }}
+          # No tags here — the merge job assembles the multi-arch manifest.
+          outputs: type=image,name=ghcr.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=build-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=build-${{ matrix.arch }}
+
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # Merge per-arch digests into one multi-arch manifest, then cut the Release.
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # git-cliff needs full history
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: docker/metadata-action@v5
         id: meta
         with:
@@ -41,19 +99,23 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
 
-      - name: Build and push all-in-one image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/allinone.Dockerfile
-          # amd64-only pre-1.0; arm64 lands with the Phase 5 polish (QEMU
-          # cross-builds of the musl Rust stage are too slow to block releases).
-          platforms: linux/amd64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Create multi-arch manifest
+        working-directory: /tmp/digests
+        run: |
+          tag_args=()
+          while IFS= read -r tag; do
+            tag_args+=(-t "$tag")
+          done < <(jq -r '.tags[]' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+          refs=()
+          for digest in *; do
+            refs+=("ghcr.io/${{ github.repository }}@sha256:$digest")
+          done
+          docker buildx imagetools create "${tag_args[@]}" "${refs[@]}"
+
+      - name: Inspect manifest
+        run: |
+          docker buildx imagetools inspect \
+            "ghcr.io/${{ github.repository }}:${GITHUB_REF_NAME#v}"
 
       - name: Generate release notes
         uses: orhun/git-cliff-action@v4

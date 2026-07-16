@@ -32,8 +32,11 @@ Optional API auth (`WEFT_AUTH_TOKEN`), read-only mode, Weaviate version test mat
 ### v0.7.0 — Auth hardening *(shipped 2026-07-16)*
 Session rate limiting (5 attempts/min/IP on `POST /api/v1/auth/session`, 429 + `Retry-After`), logout endpoint (`DELETE /api/v1/auth/session`) with a nav **Log out** button when auth is active.
 
-### v0.8 – v0.9 — Pre-1.0 polish
-arm64 image, docs review + upgrade guide, security review pass (threat model), 1M-object performance pass, optional gRPC data path.
+### v0.8.0 — Multi-arch & docs *(shipped 2026-07-16)*
+arm64 image (native GitHub arm runners, multi-arch manifest on GHCR), docs review (feature lists refreshed) + upgrade guide, docs-site a11y fixes (code wrap, focusable scroll regions).
+
+### v0.9 — Pre-1.0 polish
+Security review pass (threat model), 1M-object performance pass, optional gRPC data path.
 
 ### v1.0.0 — Stable
 `/api/v1` stability promise, complete documentation & walkthroughs, upgrade guide, security review.

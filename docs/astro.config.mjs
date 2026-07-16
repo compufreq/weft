@@ -11,6 +11,16 @@ export default defineConfig({
       title: "Weft",
       description:
         "The missing UI for Weaviate — zero-config, self-hosted web interface for browsing and managing Weaviate instances.",
+      // Code-block wrapping lives in ec.config.mjs (defaultProps there is
+      // reliably picked up by astro-expressive-code).
+      head: [
+        {
+          // Progressive enhancement: Starlight tables overflow-x on narrow
+          // viewports; give actually-scrollable ones keyboard focus.
+          tag: "script",
+          content: `document.addEventListener("DOMContentLoaded",()=>{for(const t of document.querySelectorAll(".sl-markdown-content table")){if(t.scrollWidth>t.clientWidth&&!t.hasAttribute("tabindex")){t.setAttribute("tabindex","0");t.setAttribute("role","region");t.setAttribute("aria-label","Scrollable table");}}});`,
+        },
+      ],
       social: [
         {
           icon: "github",
@@ -24,6 +34,7 @@ export default defineConfig({
           items: [
             { label: "Getting started", slug: "getting-started" },
             { label: "Configuration", slug: "configuration" },
+            { label: "Upgrading", slug: "upgrading" },
           ],
         },
         {

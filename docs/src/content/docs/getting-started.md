@@ -42,14 +42,20 @@ services:
       - "8080:8080"
 ```
 
-## What you can do today (v0.2)
+The image is published for **amd64 and arm64** (Apple Silicon, Raspberry Pi 5, Graviton) — Docker picks the right one automatically.
+
+## What you can do
 
 - **Browse schemas** — collections, properties, vectorizers, index config, multi-tenancy status
 - **Manage connections** — register multiple Weaviate instances at runtime
-- **Export schemas** — one-click JSON download
-- **Diff schemas** — compare two instances, or an instance against an earlier export
+- **Export & diff schemas** — one-click JSON download; compare two instances, or an instance against an earlier export
+- **Explore objects** — cursor-paginated browser with a JSON detail panel and streaming NDJSON export
+- **Search** — BM25, nearVector, nearText, and hybrid, with scores
+- **Manage tenants** — HOT/COLD activation, per-tenant object counts, tenant-scoped browsing
+- **Watch your cluster** — node & shard health, capabilities, backup create/restore
+- **Lock it down** — optional access token ([`WEFT_AUTH_TOKEN`](/weft/configuration/#authentication-v06)) and [read-only mode](/weft/configuration/#read-only-mode)
 
-Object browsing and search land in v0.3 — see the [roadmap](https://github.com/compufreq/weft/blob/main/ROADMAP.md).
+See the [roadmap](https://github.com/compufreq/weft/blob/main/ROADMAP.md) for what's next.
 
 ## Developing / building from source
 
