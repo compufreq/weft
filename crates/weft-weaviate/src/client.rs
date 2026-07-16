@@ -178,6 +178,61 @@ impl WeaviateClient {
         Self::decode(resp).await
     }
 
+    /// `GET /v1/nodes?output=verbose` — cluster node and shard health.
+    pub async fn nodes(&self) -> Result<Value, Error> {
+        let mut url = self.url("/v1/nodes")?;
+        url.query_pairs_mut().append_pair("output", "verbose");
+        let resp = self.get(url).send().await?;
+        Self::decode(resp).await
+    }
+
+    /// `GET /v1/backups/{backend}` — list backups on a backend.
+    pub async fn backups(&self, backend: &str) -> Result<Value, Error> {
+        let resp = self
+            .get(self.url(&format!("/v1/backups/{backend}"))?)
+            .send()
+            .await?;
+        Self::decode(resp).await
+    }
+
+    /// `POST /v1/backups/{backend}` — start a backup.
+    pub async fn backup_create(&self, backend: &str, id: &str) -> Result<Value, Error> {
+        let resp = self
+            .post(self.url(&format!("/v1/backups/{backend}"))?)
+            .json(&serde_json::json!({ "id": id }))
+            .send()
+            .await?;
+        Self::decode(resp).await
+    }
+
+    /// `GET /v1/backups/{backend}/{id}` — backup creation status.
+    pub async fn backup_status(&self, backend: &str, id: &str) -> Result<Value, Error> {
+        let resp = self
+            .get(self.url(&format!("/v1/backups/{backend}/{id}"))?)
+            .send()
+            .await?;
+        Self::decode(resp).await
+    }
+
+    /// `POST /v1/backups/{backend}/{id}/restore` — start a restore (async job).
+    pub async fn backup_restore(&self, backend: &str, id: &str) -> Result<Value, Error> {
+        let resp = self
+            .post(self.url(&format!("/v1/backups/{backend}/{id}/restore"))?)
+            .json(&serde_json::json!({}))
+            .send()
+            .await?;
+        Self::decode(resp).await
+    }
+
+    /// `GET /v1/backups/{backend}/{id}/restore` — restore job status.
+    pub async fn backup_restore_status(&self, backend: &str, id: &str) -> Result<Value, Error> {
+        let resp = self
+            .get(self.url(&format!("/v1/backups/{backend}/{id}/restore"))?)
+            .send()
+            .await?;
+        Self::decode(resp).await
+    }
+
     /// `GET /v1/schema/{class}/tenants` — list tenants with activity status.
     pub async fn tenants(&self, class: &str) -> Result<Value, Error> {
         let resp = self

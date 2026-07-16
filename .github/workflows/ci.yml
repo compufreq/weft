@@ -54,6 +54,8 @@ jobs:
             -e AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=true \
             -e PERSISTENCE_DATA_PATH=/var/lib/weaviate \
             -e DEFAULT_VECTORIZER_MODULE=none \
+            -e ENABLE_MODULES=backup-filesystem \
+            -e BACKUP_FILESYSTEM_PATH=/var/lib/weaviate/backups \
             -e CLUSTER_HOSTNAME=node1 \
             cr.weaviate.io/semitechnologies/weaviate:1.37.2 \
             --host 0.0.0.0 --port 8080 --scheme http

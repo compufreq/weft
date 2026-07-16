@@ -61,6 +61,23 @@ pub fn app_with_proxy(state: AppState, ssr: Option<SsrProxy>) -> Router {
                 .post(api::tenants::create)
                 .put(api::tenants::update),
         )
+        .route("/api/v1/instances/{id}/nodes", get(api::ops::nodes))
+        .route(
+            "/api/v1/instances/{id}/capabilities",
+            get(api::ops::capabilities),
+        )
+        .route(
+            "/api/v1/instances/{id}/backups/{backend}",
+            get(api::ops::backups_list).post(api::ops::backups_create),
+        )
+        .route(
+            "/api/v1/instances/{id}/backups/{backend}/{backup_id}",
+            get(api::ops::backups_status),
+        )
+        .route(
+            "/api/v1/instances/{id}/backups/{backend}/{backup_id}/restore",
+            post(api::ops::backups_restore).get(api::ops::backups_restore_status),
+        )
         .layer(TraceLayer::new_for_http())
         .layer(CompressionLayer::new())
         // NOTE: no server-side TimeoutLayer needed — upstream calls are already

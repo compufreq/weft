@@ -142,6 +142,33 @@ export interface Tenant {
   count?: number | null;
 }
 
+export interface NodeShard {
+  name: string;
+  class: string;
+  objectCount?: number;
+  vectorIndexingStatus?: string;
+}
+
+export interface ClusterNode {
+  name: string;
+  status: string;
+  version?: string;
+  stats?: { objectCount?: number; shardCount?: number };
+  shards?: NodeShard[] | null;
+}
+
+export interface Capabilities {
+  version: string;
+  modules: string[];
+  backup_backends: string[];
+}
+
+export interface Backup {
+  id: string;
+  status?: string;
+  classes?: string[];
+}
+
 export const api = {
   instances: () => fetchJson<InstanceSummary[]>("/api/v1/instances"),
   addInstance: (input: AddInstanceInput) =>
@@ -203,6 +230,28 @@ export const api = {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ updates }),
       },
+    ),
+  nodes: (instanceId: string) =>
+    fetchJson<{ nodes: ClusterNode[] }>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/nodes`,
+    ),
+  capabilities: (instanceId: string) =>
+    fetchJson<Capabilities>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/capabilities`,
+    ),
+  backups: (instanceId: string, backend: string) =>
+    fetchJson<{ backups: Backup[] }>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/backups/${encodeURIComponent(backend)}`,
+    ),
+  createBackup: (instanceId: string, backend: string, id?: string) =>
+    postJson<Backup>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/backups/${encodeURIComponent(backend)}`,
+      { id },
+    ),
+  restoreBackup: (instanceId: string, backend: string, backupId: string) =>
+    postJson<Backup>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/backups/${encodeURIComponent(backend)}/${encodeURIComponent(backupId)}/restore`,
+      {},
     ),
   /** Browser-only: URL for the NDJSON objects download. */
   exportObjectsUrl: (instanceId: string, className: string, tenant?: string) => {

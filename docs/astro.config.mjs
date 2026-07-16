@@ -42,6 +42,10 @@ export default defineConfig({
               label: "v0.4 — Multi-tenancy",
               slug: "walkthroughs/phase-3-multi-tenancy",
             },
+            {
+              label: "v0.5 — Ops dashboard",
+              slug: "walkthroughs/phase-4-ops-dashboard",
+            },
           ],
         },
       ],
