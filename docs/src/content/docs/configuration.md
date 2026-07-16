@@ -65,7 +65,9 @@ docker run -d -p 8080:8080 \
 
 ## Read-only mode
 
-`WEFT_READ_ONLY=true` turns Weft into a safe viewer: browsing, search, and export work; anything mutating (adding instances, tenant changes, backups) is rejected with `403 read_only` and the UI shows a banner. Handy for giving a whole team visibility without handing out write access.
+`WEFT_READ_ONLY=true` turns Weft into a safe viewer: browsing, search, filters, aggregations, the GraphQL console, and export all work; anything mutating (adding instances, tenant changes, backups) is rejected with `403 read_only` and the UI shows a banner. Handy for giving a whole team visibility without handing out write access.
+
+Query-style POST endpoints (`…/search`, `…/aggregate`, `…/schema/diff`, `…/graphql`) are explicitly allowed in read-only mode — they carry request bodies but never mutate. The GraphQL console is safe because Weaviate's GraphQL schema is query-only; all mutations in Weaviate go over REST. *(v0.9 fixed a bug where read-only mode incorrectly blocked search and diff.)*
 
 :::note[There is intentionally no UI toggle]
 Read-only mode (like the auth token) is a **deployment-level** switch — it can only be changed by restarting the container without `WEFT_READ_ONLY`. If it were toggleable from the UI, anyone with browser access could disable it, which would defeat its purpose. Check a deployment's current state with `GET /api/v1/auth`:

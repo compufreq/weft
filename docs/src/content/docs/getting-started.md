@@ -50,7 +50,9 @@ The image is published for **amd64 and arm64** (Apple Silicon, Raspberry Pi 5, G
 - **Manage connections** — register multiple Weaviate instances at runtime
 - **Export & diff schemas** — one-click JSON download; compare two instances, or an instance against an earlier export
 - **Explore objects** — cursor-paginated browser with a JSON detail panel and streaming NDJSON export
+- **Filter & aggregate** — structured where-filters on browse and search, live counts, per-property facets
 - **Search** — BM25, nearVector, nearText, and hybrid, with scores
+- **Query console** — raw GraphQL scratchpad per instance (query-only, safe in read-only mode)
 - **Manage tenants** — HOT/COLD activation, per-tenant object counts, tenant-scoped browsing
 - **Watch your cluster** — node & shard health, capabilities, backup create/restore
 - **Lock it down** — optional access token ([`WEFT_AUTH_TOKEN`](/weft/configuration/#authentication-v06)) and [read-only mode](/weft/configuration/#read-only-mode)

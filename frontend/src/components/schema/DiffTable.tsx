@@ -87,7 +87,7 @@ export default function DiffTable(props: { entries: DiffEntryT[] }) {
                         <span class="text-zinc-500 dark:text-zinc-400">.{entry.property}</span>
                       </Show>
                       <Show when={entry.field}>
-                        <span class="text-zinc-400 dark:text-zinc-500"> · {entry.field}</span>
+                        <span class="text-zinc-400 dark:text-zinc-400"> · {entry.field}</span>
                       </Show>
                     </td>
                     <td class="px-4 py-3">

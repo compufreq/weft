@@ -53,6 +53,12 @@ export default function SchemaPage() {
           >
             Ops
           </A>
+          <A
+            href={`/i/${params.id}/console`}
+            class="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium hover:border-weft-400 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-weft-500"
+          >
+            Console
+          </A>
         </div>
       </div>
 

@@ -272,3 +272,35 @@ async fn read_only_blocks_mutations_but_not_reads() {
     let (_, auth, _) = send(&app, "GET", "/api/v1/auth", &[], None).await;
     assert_eq!(auth["read_only"], true);
 }
+
+#[tokio::test]
+async fn read_only_allows_query_posts() {
+    // search/diff/aggregate/graphql are POST-with-body but never mutate —
+    // read-only mode must let them through the guard. (They 404 here because
+    // the test app has no instances; the point is they are NOT 403.)
+    let app = app_with(None, true);
+    for path in [
+        "/api/v1/instances/x/collections/C/search",
+        "/api/v1/instances/x/collections/C/aggregate",
+        "/api/v1/instances/x/schema/diff",
+        "/api/v1/instances/x/graphql",
+    ] {
+        let (status, body, _) = send(&app, "POST", path, &[], Some(serde_json::json!({}))).await;
+        assert_ne!(
+            status,
+            StatusCode::FORBIDDEN,
+            "read-only must not block {path}: {body}"
+        );
+    }
+
+    // Mutating POSTs stay blocked.
+    let (status, _, _) = send(
+        &app,
+        "POST",
+        "/api/v1/instances",
+        &[],
+        Some(serde_json::json!({ "name": "X", "url": "http://x:1" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}

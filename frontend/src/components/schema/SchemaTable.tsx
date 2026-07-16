@@ -78,7 +78,7 @@ export default function SchemaTable(props: { classes: ClassInfo[]; instanceId?: 
                   <td class="px-4 py-3">
                     <Show
                       when={cls.multiTenancyConfig?.enabled}
-                      fallback={<span class="text-zinc-400 dark:text-zinc-500">off</span>}
+                      fallback={<span class="text-zinc-400 dark:text-zinc-400">off</span>}
                     >
                       <span class="rounded-full bg-weft-50 px-2 py-0.5 text-xs font-medium text-weft-700 dark:bg-weft-700/20 dark:text-weft-400">
                         enabled

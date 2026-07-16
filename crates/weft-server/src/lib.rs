@@ -57,6 +57,14 @@ pub fn app_with_proxy(state: AppState, ssr: Option<SsrProxy>) -> Router {
             post(api::objects::search),
         )
         .route(
+            "/api/v1/instances/{id}/collections/{class}/aggregate",
+            post(api::objects::aggregate),
+        )
+        .route(
+            "/api/v1/instances/{id}/graphql",
+            post(api::console::graphql),
+        )
+        .route(
             "/api/v1/instances/{id}/collections/{class}/export.ndjson",
             get(api::objects::export),
         )

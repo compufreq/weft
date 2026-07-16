@@ -94,6 +94,17 @@ fn authorized(state: &AppState, headers: &HeaderMap) -> bool {
     }
 }
 
+/// POST endpoints that never mutate anything: search/diff/aggregate are pure
+/// queries that only use POST for their request bodies, and Weaviate's
+/// GraphQL schema is query-only (mutations are REST-only), so the console
+/// passthrough is read-safe too.
+fn is_read_safe_post(path: &str) -> bool {
+    path.ends_with("/search")
+        || path.ends_with("/aggregate")
+        || path.ends_with("/schema/diff")
+        || path.ends_with("/graphql")
+}
+
 /// Middleware: enforce auth + read-only on `/api` routes.
 pub async fn guard(State(state): State<AppState>, req: Request, next: Next) -> Response {
     let path = req.uri().path();
@@ -110,8 +121,9 @@ pub async fn guard(State(state): State<AppState>, req: Request, next: Next) -> R
             )
                 .into_response();
         }
-        if state.read_only && !matches!(*req.method(), Method::GET | Method::HEAD | Method::OPTIONS)
-        {
+        let read_safe = matches!(*req.method(), Method::GET | Method::HEAD | Method::OPTIONS)
+            || (*req.method() == Method::POST && is_read_safe_post(path));
+        if state.read_only && !read_safe {
             return (
                 StatusCode::FORBIDDEN,
                 Json(json!({ "error": { "code": "read_only", "message": "this Weft deployment is read-only" } })),

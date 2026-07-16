@@ -35,8 +35,17 @@ Session rate limiting (5 attempts/min/IP on `POST /api/v1/auth/session`, 429 + `
 ### v0.8.0 — Multi-arch & docs *(shipped 2026-07-16)*
 arm64 image (native GitHub arm runners, multi-arch manifest on GHCR), docs review (feature lists refreshed) + upgrade guide, docs-site a11y fixes (code wrap, focusable scroll regions).
 
-### v0.9 — Pre-1.0 polish
-Security review pass (threat model), 1M-object performance pass, optional gRPC data path.
+### v0.9.0 — Explorer completeness *(shipped 2026-07-16)*
+Where-filter builder on the object browser and search, aggregations (counts + per-property facets), raw GraphQL query console (read-safe: Weaviate's GraphQL API is query-only), read-only-mode fix for non-mutating POST endpoints.
+
+### v0.10.0 — Data write path
+Object create / edit / delete from the UI, JSON/NDJSON and CSV import with batch progress — all blocked in read-only deployments.
+
+### v0.11.0 — Schema management & aliases
+Collection create (guided form + raw JSON), add property, collection delete behind confirmation, collection alias CRUD (Weaviate ≥1.32), persisted runtime instances (volume-backed).
+
+### v0.12.0 — Ops depth
+RBAC viewer (users, roles, assignments — read-only surface over Weaviate RBAC), cluster statistics/metrics panel, vector-space visualization (2D projection of query results).
 
 ### v1.0.0 — Stable
-`/api/v1` stability promise, complete documentation & walkthroughs, upgrade guide, security review.
+Security review (threat model over the full mutation surface), `/api/v1` stability promise, complete documentation & walkthroughs.

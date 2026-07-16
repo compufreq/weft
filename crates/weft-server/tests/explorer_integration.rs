@@ -237,3 +237,164 @@ async fn ndjson_export_streams_every_object() {
         assert!(obj["properties"]["title"].is_string());
     }
 }
+
+// ---------- where-filters, aggregate, graphql console (v0.9) ----------
+
+#[tokio::test]
+async fn filtered_browse_pages_by_offset() {
+    // 25 seeded articles, categories rotate tech/science/business/sports:
+    // "science" matches exactly 6.
+    let filter = serde_json::json!({
+        "conditions": [{ "path": "category", "operator": "Equal", "value": "science" }]
+    })
+    .to_string();
+    let encoded: String = url_encode(&filter);
+
+    let (status, page1) = get(&format!(
+        "/api/v1/instances/local/collections/Article/objects?limit=4&where={encoded}"
+    ))
+    .await;
+    assert_eq!(status, StatusCode::OK, "{page1}");
+    let objects = page1["objects"].as_array().unwrap();
+    assert_eq!(objects.len(), 4);
+    assert!(objects
+        .iter()
+        .all(|o| o["properties"]["category"] == "science"));
+    assert_eq!(page1["next_cursor"], "4", "offset cursor");
+
+    let (_, page2) = get(&format!(
+        "/api/v1/instances/local/collections/Article/objects?limit=4&where={encoded}&cursor=4"
+    ))
+    .await;
+    assert_eq!(page2["objects"].as_array().unwrap().len(), 2, "6 total");
+    assert!(page2["next_cursor"].is_null(), "drained");
+}
+
+#[tokio::test]
+async fn filtered_browse_rejects_bad_filters() {
+    // Malformed JSON → 422.
+    let (status, body) =
+        get("/api/v1/instances/local/collections/Article/objects?where=notjson").await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+
+    // Unknown operator → 422 from deserialization.
+    let filter = url_encode(
+        &serde_json::json!({
+            "conditions": [{ "path": "category", "operator": "Regex", "value": "x" }]
+        })
+        .to_string(),
+    );
+    let (status, _) = get(&format!(
+        "/api/v1/instances/local/collections/Article/objects?where={filter}"
+    ))
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn search_combines_operator_with_filter() {
+    let (status, body) = post(
+        "/api/v1/instances/local/collections/Article/search",
+        serde_json::json!({
+            "kind": "bm25",
+            "query": "demo",
+            "where": {
+                "conditions": [
+                    { "path": "category", "operator": "Equal", "value": "science" }
+                ]
+            }
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let results = body["results"].as_array().unwrap();
+    assert!(!results.is_empty(), "bm25 'demo' hits every seeded article");
+    assert!(
+        results
+            .iter()
+            .all(|r| r["properties"]["category"] == "science"),
+        "filter constrains search results: {body}"
+    );
+}
+
+#[tokio::test]
+async fn aggregate_counts_and_facets() {
+    // Plain count.
+    let (status, body) = post(
+        "/api/v1/instances/local/collections/Article/aggregate",
+        serde_json::json!({}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["count"], 25);
+    assert!(body["groups"].is_null());
+
+    // Facets by category: 4 buckets, tech leads with 7.
+    let (status, body) = post(
+        "/api/v1/instances/local/collections/Article/aggregate",
+        serde_json::json!({ "group_by": "category" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["count"], 25, "sum of buckets");
+    let groups = body["groups"].as_array().unwrap();
+    assert_eq!(groups.len(), 4);
+    assert_eq!(groups[0]["value"], "tech", "sorted by count desc: {body}");
+    assert_eq!(groups[0]["count"], 7);
+
+    // Filtered count.
+    let (status, body) = post(
+        "/api/v1/instances/local/collections/Article/aggregate",
+        serde_json::json!({
+            "where": { "conditions": [
+                { "path": "category", "operator": "Equal", "value": "science" }
+            ]}
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["count"], 6);
+}
+
+#[tokio::test]
+async fn graphql_console_passes_through_data_and_errors() {
+    // A valid aggregate query returns Weaviate's envelope verbatim.
+    let (status, body) = post(
+        "/api/v1/instances/local/graphql",
+        serde_json::json!({ "query": "{ Aggregate { Article { meta { count } } } }" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["data"]["Aggregate"]["Article"][0]["meta"]["count"], 25);
+
+    // Weaviate-side GraphQL errors come back in the envelope, not as 4xx.
+    let (status, body) = post(
+        "/api/v1/instances/local/graphql",
+        serde_json::json!({ "query": "{ Get { NoSuchClass { x } } }" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert!(body["errors"].is_array(), "{body}");
+
+    // Empty query is a clean 422.
+    let (status, _) = post(
+        "/api/v1/instances/local/graphql",
+        serde_json::json!({ "query": "  " }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+/// Minimal percent-encoding for JSON in a query string.
+fn url_encode(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() * 3);
+    for b in s.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char)
+            }
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
+}

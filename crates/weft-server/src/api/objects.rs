@@ -9,7 +9,7 @@ use axum::response::IntoResponse;
 use axum::Json;
 use serde::Deserialize;
 use serde_json::{json, Value};
-use weft_weaviate::graphql::{self, Search};
+use weft_weaviate::graphql::{self, Search, WhereFilter};
 use weft_weaviate::{ObjectsQuery, WeaviateClient};
 
 const DEFAULT_LIMIT: usize = 50;
@@ -23,6 +23,14 @@ pub struct ObjectsParams {
     pub tenant: Option<String>,
     #[serde(default)]
     pub include_vector: bool,
+    /// URL-encoded JSON `WhereFilter`. When present, browsing switches to the
+    /// GraphQL path (the REST objects API cannot filter).
+    #[serde(rename = "where")]
+    pub filter: Option<String>,
+}
+
+fn parse_filter(raw: &str) -> Result<WhereFilter, ApiError> {
+    serde_json::from_str(raw).map_err(|e| ApiError::InvalidInput(format!("invalid filter: {e}")))
 }
 
 /// `GET /api/v1/instances/{id}/collections/{class}/objects`
@@ -37,6 +45,11 @@ pub async fn list(
         .instance(&id)
         .ok_or_else(|| ApiError::InstanceNotFound(id))?;
     let limit = params.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
+
+    if let Some(raw_filter) = &params.filter {
+        let filter = parse_filter(raw_filter)?;
+        return list_filtered(&instance, &class, &filter, limit, &params).await;
+    }
 
     let raw = instance
         .client
@@ -60,6 +73,91 @@ pub async fn list(
                 .map(String::from)
         })
         .flatten();
+
+    Ok(Json(
+        json!({ "objects": objects, "next_cursor": next_cursor }),
+    ))
+}
+
+/// Look up a class in the live schema and list its primitive properties.
+async fn class_properties(
+    instance: &crate::state::Instance,
+    class: &str,
+) -> Result<Vec<String>, ApiError> {
+    let schema = instance.client.schema().await?;
+    let cls = schema
+        .classes
+        .iter()
+        .find(|c| c.class == class)
+        .ok_or_else(|| ApiError::CollectionNotFound(class.to_string()))?;
+    Ok(primitive_properties(cls))
+}
+
+/// Surface Weaviate GraphQL errors as a clean 422.
+fn check_graphql_errors(envelope: &Value, what: &str) -> Result<(), ApiError> {
+    if let Some(errors) = envelope.get("errors").filter(|e| e.is_array()) {
+        let message = errors
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|e| e["message"].as_str())
+            .collect::<Vec<_>>()
+            .join("; ");
+        return Err(ApiError::InvalidInput(format!("{what} failed: {message}")));
+    }
+    Ok(())
+}
+
+/// Filtered browse via GraphQL, mapped to the same shape as the REST path.
+///
+/// Weaviate's `after` cursor is incompatible with `where`, so the filtered
+/// path paginates by offset — `next_cursor` carries the next offset as an
+/// opaque string the client passes straight back.
+async fn list_filtered(
+    instance: &crate::state::Instance,
+    class: &str,
+    filter: &WhereFilter,
+    limit: usize,
+    params: &ObjectsParams,
+) -> Result<Json<Value>, ApiError> {
+    let offset: usize = match &params.cursor {
+        None => 0,
+        Some(c) => c.parse().map_err(|_| {
+            ApiError::InvalidInput("filtered browsing uses the returned next_cursor".into())
+        })?,
+    };
+    let properties = class_properties(instance, class).await?;
+
+    let gql = graphql::build_browse(
+        class,
+        &properties,
+        filter,
+        limit,
+        offset,
+        params.tenant.as_deref(),
+    )
+    .map_err(|e| ApiError::InvalidInput(e.to_string()))?;
+    let envelope = instance.client.graphql(&gql).await?;
+    check_graphql_errors(&envelope, "filtered browse")?;
+
+    let hits = envelope["data"]["Get"][class]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    let objects: Vec<Value> = hits
+        .into_iter()
+        .map(|hit| {
+            let mut props = hit.as_object().cloned().unwrap_or_default();
+            let additional = props.remove("_additional").unwrap_or(Value::Null);
+            json!({
+                "id": additional["id"],
+                "class": class,
+                "properties": Value::Object(props),
+            })
+        })
+        .collect();
+
+    let next_cursor = (objects.len() == limit).then(|| (offset + objects.len()).to_string());
 
     Ok(Json(
         json!({ "objects": objects, "next_cursor": next_cursor }),
@@ -92,6 +190,9 @@ pub struct SearchRequest {
     pub kind: SearchKind,
     pub limit: Option<usize>,
     pub tenant: Option<String>,
+    /// Optional structured `where` filter combined with the search operator.
+    #[serde(rename = "where")]
+    pub filter: Option<WhereFilter>,
 }
 
 /// Only primitive properties can be selected in a flat GraphQL query.
@@ -122,13 +223,7 @@ pub async fn search(
     let limit = body.limit.unwrap_or(25).clamp(1, MAX_LIMIT);
 
     // Property selection comes from the live schema.
-    let schema = instance.client.schema().await?;
-    let cls = schema
-        .classes
-        .iter()
-        .find(|c| c.class == class)
-        .ok_or_else(|| ApiError::CollectionNotFound(class.clone()))?;
-    let properties = primitive_properties(cls);
+    let properties = class_properties(&instance, &class).await?;
 
     let search = match &body.kind {
         SearchKind::Bm25 { query } => Search::Bm25 {
@@ -151,21 +246,19 @@ pub async fn search(
         },
     };
 
-    let gql = graphql::build_get(&class, &properties, &search, limit, body.tenant.as_deref())
-        .map_err(|e| ApiError::InvalidInput(e.to_string()))?;
+    let gql = graphql::build_get(
+        &class,
+        &properties,
+        &search,
+        limit,
+        body.tenant.as_deref(),
+        body.filter.as_ref(),
+    )
+    .map_err(|e| ApiError::InvalidInput(e.to_string()))?;
     let envelope = instance.client.graphql(&gql).await?;
 
     // Surface Weaviate GraphQL errors (e.g. nearText without a vectorizer).
-    if let Some(errors) = envelope.get("errors").filter(|e| e.is_array()) {
-        let message = errors
-            .as_array()
-            .unwrap()
-            .iter()
-            .filter_map(|e| e["message"].as_str())
-            .collect::<Vec<_>>()
-            .join("; ");
-        return Err(ApiError::InvalidInput(format!("search failed: {message}")));
-    }
+    check_graphql_errors(&envelope, "search")?;
 
     let hits = envelope["data"]["Get"][&class]
         .as_array()
@@ -191,6 +284,77 @@ pub async fn search(
         .collect();
 
     Ok(Json(json!({ "results": results })))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AggregateRequest {
+    pub tenant: Option<String>,
+    #[serde(rename = "where")]
+    pub filter: Option<WhereFilter>,
+    /// Property to group by (facets). Buckets are capped server-side.
+    pub group_by: Option<String>,
+}
+
+/// Facet buckets beyond this are truncated (high-cardinality guard).
+const MAX_GROUPS: usize = 25;
+
+/// `POST /api/v1/instances/{id}/collections/{class}/aggregate`
+///
+/// Total count (optionally filtered/tenant-scoped), plus facet buckets when
+/// `group_by` is set. Read-only-safe despite being a POST.
+pub async fn aggregate(
+    State(state): State<AppState>,
+    Path((id, class)): Path<(String, String)>,
+    Json(body): Json<AggregateRequest>,
+) -> Result<Json<Value>, ApiError> {
+    let instance = state
+        .instance(&id)
+        .ok_or_else(|| ApiError::InstanceNotFound(id))?;
+
+    let gql = graphql::build_aggregate(
+        &class,
+        body.tenant.as_deref(),
+        body.filter.as_ref(),
+        body.group_by.as_deref(),
+    )
+    .map_err(|e| ApiError::InvalidInput(e.to_string()))?;
+    let envelope = instance.client.graphql(&gql).await?;
+    check_graphql_errors(&envelope, "aggregate")?;
+
+    let rows = envelope["data"]["Aggregate"][&class]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+
+    if body.group_by.is_none() {
+        let count = rows
+            .first()
+            .and_then(|r| r["meta"]["count"].as_u64())
+            .unwrap_or(0);
+        return Ok(Json(json!({ "count": count, "groups": Value::Null })));
+    }
+
+    let mut groups: Vec<Value> = rows
+        .iter()
+        .map(|r| {
+            json!({
+                "value": r["groupedBy"]["value"],
+                "count": r["meta"]["count"].as_u64().unwrap_or(0),
+            })
+        })
+        .collect();
+    // Largest buckets first; cap to keep the response bounded.
+    groups.sort_by(|a, b| b["count"].as_u64().cmp(&a["count"].as_u64()));
+    let truncated = groups.len() > MAX_GROUPS;
+    groups.truncate(MAX_GROUPS);
+    let count: u64 = rows
+        .iter()
+        .filter_map(|r| r["meta"]["count"].as_u64())
+        .sum();
+
+    Ok(Json(
+        json!({ "count": count, "groups": groups, "groups_truncated": truncated }),
+    ))
 }
 
 #[derive(Debug, Deserialize)]

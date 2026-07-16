@@ -123,18 +123,55 @@ export interface ObjectsPage {
   next_cursor: string | null;
 }
 
+/** Operators accepted by the backend's structured `where` filter. */
+export type WhereOperator =
+  | "Equal"
+  | "NotEqual"
+  | "GreaterThan"
+  | "GreaterThanEqual"
+  | "LessThan"
+  | "LessThanEqual"
+  | "Like"
+  | "ContainsAny"
+  | "ContainsAll"
+  | "IsNull";
+
+export type FilterValueType = "text" | "int" | "number" | "boolean" | "date";
+
+export interface FilterCondition {
+  path: string;
+  operator: WhereOperator;
+  value?: unknown;
+  value_type?: FilterValueType;
+}
+
+/** A flat AND of conditions (the raw console covers Or/nesting). */
+export interface WhereFilter {
+  conditions: FilterCondition[];
+}
+
+interface SearchCommon {
+  limit?: number;
+  tenant?: string;
+  where?: WhereFilter;
+}
+
 export type SearchInput =
-  | { kind: "bm25"; query: string; limit?: number; tenant?: string }
-  | { kind: "near_text"; query: string; limit?: number; tenant?: string }
-  | { kind: "near_vector"; vector: number[]; limit?: number; tenant?: string }
-  | {
+  | ({ kind: "bm25"; query: string } & SearchCommon)
+  | ({ kind: "near_text"; query: string } & SearchCommon)
+  | ({ kind: "near_vector"; vector: number[] } & SearchCommon)
+  | ({
       kind: "hybrid";
       query: string;
       vector?: number[];
       alpha?: number;
-      limit?: number;
-      tenant?: string;
-    };
+    } & SearchCommon);
+
+export interface AggregateResult {
+  count: number;
+  groups: { value: unknown; count: number }[] | null;
+  groups_truncated?: boolean;
+}
 
 export interface SearchHit {
   id: string;
@@ -201,12 +238,13 @@ export const api = {
   objects: (
     instanceId: string,
     className: string,
-    opts: { cursor?: string; limit?: number; tenant?: string } = {},
+    opts: { cursor?: string; limit?: number; tenant?: string; where?: WhereFilter } = {},
   ) => {
     const params = new URLSearchParams();
     if (opts.cursor) params.set("cursor", opts.cursor);
     if (opts.limit) params.set("limit", String(opts.limit));
     if (opts.tenant) params.set("tenant", opts.tenant);
+    if (opts.where) params.set("where", JSON.stringify(opts.where));
     const qs = params.size > 0 ? `?${params}` : "";
     return fetchJson<ObjectsPage>(
       `/api/v1/instances/${encodeURIComponent(instanceId)}/collections/${encodeURIComponent(className)}/objects${qs}`,
@@ -216,6 +254,20 @@ export const api = {
     postJson<{ results: SearchHit[] }>(
       `/api/v1/instances/${encodeURIComponent(instanceId)}/collections/${encodeURIComponent(className)}/search`,
       input,
+    ),
+  aggregate: (
+    instanceId: string,
+    className: string,
+    input: { tenant?: string; where?: WhereFilter; group_by?: string } = {},
+  ) =>
+    postJson<AggregateResult>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/collections/${encodeURIComponent(className)}/aggregate`,
+      input,
+    ),
+  graphql: (instanceId: string, query: string) =>
+    postJson<{ data?: unknown; errors?: { message?: string }[] }>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/graphql`,
+      { query },
     ),
   tenants: (instanceId: string, className: string, counts = true) =>
     fetchJson<{ tenants: Tenant[] }>(
