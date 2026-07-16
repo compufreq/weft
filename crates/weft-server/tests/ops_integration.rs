@@ -192,3 +192,32 @@ async fn disabled_backend_and_bad_ids_are_clean_4xx() {
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     assert_eq!(body["error"]["code"], "invalid_input");
 }
+
+// ---------- cluster statistics + RBAC visibility (v0.12) ----------
+
+#[tokio::test]
+async fn cluster_statistics_report_raft_state() {
+    let (status, stats) = request("GET", "/api/v1/instances/local/statistics", None).await;
+    assert_eq!(status, StatusCode::OK, "{stats}");
+    let nodes = stats["statistics"].as_array().expect("statistics array");
+    assert!(!nodes.is_empty());
+    assert!(nodes[0]["name"].is_string(), "{stats}");
+    // Single-node dev cluster: it is its own leader and synchronized.
+    assert!(stats["synchronized"].as_bool().unwrap_or(false), "{stats}");
+}
+
+#[tokio::test]
+async fn rbac_degrades_gracefully_on_anonymous_instances() {
+    // The dev/CI Weaviate runs with anonymous access and no RBAC — the
+    // overview must answer 200 with enabled:false, never a 4xx/5xx.
+    let (status, rbac) = request("GET", "/api/v1/instances/local/rbac", None).await;
+    assert_eq!(status, StatusCode::OK, "{rbac}");
+    if rbac["enabled"] == false {
+        assert!(rbac["reason"].as_str().unwrap().len() > 10, "{rbac}");
+        assert!(rbac["roles"].as_array().unwrap().is_empty());
+    } else {
+        // RBAC-enabled environment: roles must be a list.
+        assert!(rbac["roles"].is_array(), "{rbac}");
+        assert!(rbac["users"].is_array(), "{rbac}");
+    }
+}

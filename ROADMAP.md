@@ -44,8 +44,8 @@ Object create / edit / delete from the UI, JSON/NDJSON batch import with per-ite
 ### v0.11.0 — Schema management & aliases *(shipped 2026-07-16)*
 Collection create (guided form + raw JSON), add property, collection delete behind typed confirmation, collection alias CRUD (Weaviate ≥1.32, graceful degradation below), persisted runtime instances (`WEFT_INSTANCES_FILE`).
 
-### v0.12.0 — Ops depth
-RBAC viewer (users, roles, assignments — read-only surface over Weaviate RBAC), cluster statistics/metrics panel, vector-space visualization (2D projection of query results).
+### v0.12.0 — Ops depth *(shipped 2026-07-17)*
+RBAC viewer (roles, users, assignments — read-only, graceful when RBAC is off), Raft cluster-statistics panel, vector-space map (2D PCA projection with facet coloring, no external libs).
 
 ### v1.0.0 — Stable
 Security review (threat model over the full mutation surface), `/api/v1` stability promise, complete documentation & walkthroughs.

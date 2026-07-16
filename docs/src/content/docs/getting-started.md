@@ -56,7 +56,8 @@ The image is published for **amd64 and arm64** (Apple Silicon, Raspberry Pi 5, G
 - **Search** — BM25, nearVector, nearText, and hybrid, with scores
 - **Query console** — raw GraphQL scratchpad per instance (query-only, safe in read-only mode)
 - **Manage tenants** — HOT/COLD activation, per-tenant object counts, tenant-scoped browsing
-- **Watch your cluster** — node & shard health, capabilities, backup create/restore
+- **Watch your cluster** — node & shard health, Raft statistics, capabilities, backup create/restore, read-only RBAC visibility (roles, users, assignments)
+- **See your vectors** — 2D PCA map of a collection's embedding space, colored by facet
 - **Lock it down** — optional access token ([`WEFT_AUTH_TOKEN`](/weft/configuration/#authentication-v06)) and [read-only mode](/weft/configuration/#read-only-mode)
 
 See the [roadmap](https://github.com/compufreq/weft/blob/main/ROADMAP.md) for what's next.

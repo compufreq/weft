@@ -333,6 +333,32 @@ impl WeaviateClient {
         }
     }
 
+    /// `GET /v1/authz/roles` — RBAC roles (needs RBAC enabled + admin key).
+    pub async fn authz_roles(&self) -> Result<Value, Error> {
+        let resp = self.get(self.url("/v1/authz/roles")?).send().await?;
+        Self::decode(resp).await
+    }
+
+    /// `GET /v1/users/db` — database users (Weaviate ≥ 1.30, RBAC enabled).
+    pub async fn db_users(&self) -> Result<Value, Error> {
+        let resp = self.get(self.url("/v1/users/db")?).send().await?;
+        Self::decode(resp).await
+    }
+
+    /// `GET /v1/authz/users/{id}/roles?userType=db` — a user's assigned roles.
+    pub async fn user_roles(&self, user_id: &str) -> Result<Value, Error> {
+        let mut url = self.url(&format!("/v1/authz/users/{user_id}/roles"))?;
+        url.query_pairs_mut().append_pair("userType", "db");
+        let resp = self.get(url).send().await?;
+        Self::decode(resp).await
+    }
+
+    /// `GET /v1/cluster/statistics` — Raft cluster statistics.
+    pub async fn cluster_statistics(&self) -> Result<Value, Error> {
+        let resp = self.get(self.url("/v1/cluster/statistics")?).send().await?;
+        Self::decode(resp).await
+    }
+
     /// `GET /v1/nodes?output=verbose` — cluster node and shard health.
     pub async fn nodes(&self) -> Result<Value, Error> {
         let mut url = self.url("/v1/nodes")?;

@@ -2,7 +2,16 @@ import { A, useParams } from "@solidjs/router";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import BackupsTable from "~/components/ops/BackupsTable";
 import NodesPanel from "~/components/ops/NodesPanel";
-import { api, type Backup, type Capabilities, type ClusterNode } from "~/lib/api";
+import RbacPanel from "~/components/ops/RbacPanel";
+import StatsCard from "~/components/ops/StatsCard";
+import {
+  api,
+  type Backup,
+  type Capabilities,
+  type ClusterNode,
+  type ClusterStatistics,
+  type RbacOverview,
+} from "~/lib/api";
 
 const POLL_MS = 10_000;
 
@@ -41,6 +50,9 @@ export default function OpsPage() {
     }
   };
 
+  const [rbac, setRbac] = createSignal<RbacOverview | null>(null);
+  const [stats, setStats] = createSignal<ClusterStatistics | null>(null);
+
   onMount(() => {
     void (async () => {
       await refreshNodes();
@@ -53,6 +65,17 @@ export default function OpsPage() {
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
+      }
+      // Auxiliary panels — failures here never block the ops page.
+      try {
+        setRbac(await api.rbac(instanceId()));
+      } catch {
+        setRbac(null);
+      }
+      try {
+        setStats(await api.statistics(instanceId()));
+      } catch {
+        setStats(null);
       }
     })();
     const timer = setInterval(() => void refreshNodes(), POLL_MS);
@@ -210,6 +233,11 @@ export default function OpsPage() {
           <BackupsTable backups={backups()} onRestore={(b) => void restoreBackup(b)} />
         </div>
       </Show>
+
+      <div class="mt-6 grid gap-6 lg:grid-cols-2">
+        <Show when={stats()}>{(s) => <StatsCard stats={s()} />}</Show>
+        <Show when={rbac()}>{(r) => <RbacPanel data={r()} />}</Show>
+      </div>
     </section>
   );
 }

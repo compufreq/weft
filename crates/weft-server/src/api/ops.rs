@@ -53,6 +53,18 @@ pub async fn capabilities(
     })))
 }
 
+/// `GET /api/v1/instances/{id}/statistics` — Raft cluster statistics
+/// (leader, synchronization state, per-node Raft info).
+pub async fn statistics(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    let instance = state
+        .instance(&id)
+        .ok_or_else(|| ApiError::InstanceNotFound(id))?;
+    Ok(Json(instance.client.cluster_statistics().await?))
+}
+
 /// Validate a backend/backup-id path segment (defense in depth — these are
 /// interpolated into upstream URL paths).
 fn path_segment(s: &str) -> Result<&str, ApiError> {

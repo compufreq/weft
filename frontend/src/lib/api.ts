@@ -232,6 +232,30 @@ export interface Backup {
   classes?: string[];
 }
 
+export interface RbacRole {
+  name: string;
+  permissions?: unknown[];
+}
+
+export interface RbacUser {
+  user_id: string;
+  active?: boolean;
+  roles: string[];
+}
+
+export interface RbacOverview {
+  enabled: boolean;
+  reason?: string;
+  roles: RbacRole[];
+  users: RbacUser[];
+  users_truncated?: boolean;
+}
+
+export interface ClusterStatistics {
+  statistics: { name: string; status?: string; leaderId?: string; raft?: unknown }[];
+  synchronized?: boolean;
+}
+
 export const api = {
   instances: () => fetchJson<InstanceSummary[]>("/api/v1/instances"),
   addInstance: (input: AddInstanceInput) =>
@@ -256,13 +280,20 @@ export const api = {
   objects: (
     instanceId: string,
     className: string,
-    opts: { cursor?: string; limit?: number; tenant?: string; where?: WhereFilter } = {},
+    opts: {
+      cursor?: string;
+      limit?: number;
+      tenant?: string;
+      where?: WhereFilter;
+      includeVector?: boolean;
+    } = {},
   ) => {
     const params = new URLSearchParams();
     if (opts.cursor) params.set("cursor", opts.cursor);
     if (opts.limit) params.set("limit", String(opts.limit));
     if (opts.tenant) params.set("tenant", opts.tenant);
     if (opts.where) params.set("where", JSON.stringify(opts.where));
+    if (opts.includeVector) params.set("include_vector", "true");
     const qs = params.size > 0 ? `?${params}` : "";
     return fetchJson<ObjectsPage>(
       `/api/v1/instances/${encodeURIComponent(instanceId)}/collections/${encodeURIComponent(className)}/objects${qs}`,
@@ -308,6 +339,10 @@ export const api = {
     fetchJson<void>(
       `/api/v1/instances/${encodeURIComponent(instanceId)}/aliases/${encodeURIComponent(alias)}`,
       { method: "DELETE" },
+    ),
+  getObject: (instanceId: string, className: string, uuid: string, tenant?: string) =>
+    fetchJson<WeaviateObject>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/collections/${encodeURIComponent(className)}/objects/${encodeURIComponent(uuid)}${tenant ? `?tenant=${encodeURIComponent(tenant)}` : ""}`,
     ),
   createObject: (
     instanceId: string,
@@ -384,6 +419,12 @@ export const api = {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ updates }),
       },
+    ),
+  rbac: (instanceId: string) =>
+    fetchJson<RbacOverview>(`/api/v1/instances/${encodeURIComponent(instanceId)}/rbac`),
+  statistics: (instanceId: string) =>
+    fetchJson<ClusterStatistics>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/statistics`,
     ),
   nodes: (instanceId: string) =>
     fetchJson<{ nodes: ClusterNode[] }>(

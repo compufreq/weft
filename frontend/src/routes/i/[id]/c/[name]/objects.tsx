@@ -11,6 +11,7 @@ import FilterBuilder, {
 } from "~/components/explorer/FilterBuilder";
 import ObjectsTable from "~/components/explorer/ObjectsTable";
 import SearchResults from "~/components/explorer/SearchResults";
+import VectorMap, { type MapPoint } from "~/components/explorer/VectorMap";
 import {
   api,
   type AggregateResult,
@@ -21,7 +22,9 @@ import {
   type WhereFilter,
 } from "~/lib/api";
 
-type Mode = "browse" | "search" | "import";
+type Mode = "browse" | "search" | "import" | "map";
+
+const MAP_SAMPLE = 200;
 type SearchKind = "bm25" | "hybrid" | "near_text" | "near_vector";
 
 export default function ObjectsPage() {
@@ -196,6 +199,58 @@ export default function ObjectsPage() {
   const needsQuery = () => kind() !== "near_vector";
   const needsVector = () => kind() === "near_vector" || kind() === "hybrid";
 
+  // --- vector map state ---
+  const [mapPoints, setMapPoints] = createSignal<MapPoint[] | null>(null);
+  const [mapError, setMapError] = createSignal<string | null>(null);
+  const [mapLoading, setMapLoading] = createSignal(false);
+
+  const loadMap = async () => {
+    setMapLoading(true);
+    setMapError(null);
+    try {
+      const page = await api.objects(instanceId(), className(), {
+        limit: MAP_SAMPLE,
+        tenant: tenant() || undefined,
+        includeVector: true,
+      });
+      const withVectors = page.objects.filter(
+        (o) => Array.isArray(o.vector) && o.vector.length > 1,
+      );
+      // Color by the text property that looks most like a facet: the one
+      // with the fewest distinct values (but more than one, at most 10).
+      let groupProp: string | undefined;
+      let best = Number.POSITIVE_INFINITY;
+      for (const p of properties().filter((p) => p.dataType[0] === "text")) {
+        const distinct = new Set(
+          withVectors.map((o) => String(o.properties[p.name] ?? "")),
+        ).size;
+        if (distinct > 1 && distinct <= 10 && distinct < best) {
+          best = distinct;
+          groupProp = p.name;
+        }
+      }
+      const points: MapPoint[] = withVectors.map((o) => ({
+        id: o.id,
+        vector: o.vector as number[],
+        label: String(Object.values(o.properties)[0] ?? o.id).slice(0, 60) || o.id,
+        group: groupProp ? String(o.properties[groupProp] ?? "") : undefined,
+      }));
+      if (points.length === 0) {
+        setMapError(
+          "No vectors found — this collection may have no vector index, or objects were inserted without vectors.",
+        );
+        setMapPoints(null);
+      } else {
+        setMapPoints(points);
+      }
+    } catch (err) {
+      setMapError(err instanceof Error ? err.message : String(err));
+      setMapPoints(null);
+    } finally {
+      setMapLoading(false);
+    }
+  };
+
   // --- write path (hidden on read-only deployments) ---
   const saveObject = async (properties: Record<string, unknown>) => {
     const current = editing();
@@ -307,6 +362,21 @@ export default function ObjectsPage() {
           }`}
         >
           Search
+        </button>
+        <button
+          role="tab"
+          aria-selected={mode() === "map"}
+          onClick={() => {
+            setMode("map");
+            if (!mapPoints() && !mapLoading()) void loadMap();
+          }}
+          class={`rounded-t-lg px-4 py-2 text-sm font-medium ${
+            mode() === "map"
+              ? "border-b-2 border-weft-500 text-weft-600 dark:text-weft-400"
+              : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          }`}
+        >
+          Map
         </button>
         <Show when={!readOnly()}>
           <button
@@ -472,6 +542,37 @@ export default function ObjectsPage() {
                   <div class="mt-6">
                     <SearchResults hits={h()} onSelect={(hit) => setSelected(hit)} />
                   </div>
+                )}
+              </Show>
+            </Match>
+
+            <Match when={mode() === "map"}>
+              <Show when={mapError()}>
+                <div
+                  role="alert"
+                  class="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
+                >
+                  {mapError()}
+                </div>
+              </Show>
+              <Show when={mapLoading()}>
+                <p class="text-sm text-zinc-500">Projecting vectors…</p>
+              </Show>
+              <Show when={mapPoints()}>
+                {(points) => (
+                  <VectorMap
+                    points={points()}
+                    selectedId={selected()?.id ?? null}
+                    onSelect={(id) => {
+                      void (async () => {
+                        try {
+                          setSelected(await api.getObject(instanceId(), className(), id, tenant() || undefined));
+                        } catch {
+                          // Selection is best-effort; the map itself still works.
+                        }
+                      })();
+                    }}
+                  />
                 )}
               </Show>
             </Match>
