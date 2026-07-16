@@ -34,6 +34,10 @@ export default defineConfig({
               label: "v0.2 — Schema & connections",
               slug: "walkthroughs/phase-1-schema-connections",
             },
+            {
+              label: "v0.3 — Data explorer",
+              slug: "walkthroughs/phase-2-data-explorer",
+            },
           ],
         },
       ],

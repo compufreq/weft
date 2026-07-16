@@ -13,7 +13,8 @@
 
 mod client;
 mod error;
+pub mod graphql;
 pub mod types;
 
-pub use client::WeaviateClient;
+pub use client::{ObjectsQuery, WeaviateClient};
 pub use error::Error;

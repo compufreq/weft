@@ -55,15 +55,23 @@ export default function ClassDetailPage() {
         >
           {(c) => (
             <>
-              <div class="mt-2 flex flex-wrap items-center gap-3">
-                <h1 id="class-heading" class="text-2xl font-semibold tracking-tight">
-                  {c().class}
-                </h1>
-                <Show when={c().multiTenancyConfig?.enabled}>
-                  <span class="rounded-full bg-weft-50 px-2 py-0.5 text-xs font-medium text-weft-700 dark:bg-weft-700/20 dark:text-weft-400">
-                    multi-tenant
-                  </span>
-                </Show>
+              <div class="mt-2 flex flex-wrap items-center justify-between gap-3">
+                <div class="flex flex-wrap items-center gap-3">
+                  <h1 id="class-heading" class="text-2xl font-semibold tracking-tight">
+                    {c().class}
+                  </h1>
+                  <Show when={c().multiTenancyConfig?.enabled}>
+                    <span class="rounded-full bg-weft-50 px-2 py-0.5 text-xs font-medium text-weft-700 dark:bg-weft-700/20 dark:text-weft-400">
+                      multi-tenant
+                    </span>
+                  </Show>
+                </div>
+                <A
+                  href={`/i/${params.id}/c/${encodeURIComponent(c().class)}/objects`}
+                  class="rounded-lg bg-weft-600 px-4 py-2 text-sm font-medium text-white hover:bg-weft-700"
+                >
+                  Browse objects →
+                </A>
               </div>
               <Show when={c().description}>
                 <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{c().description}</p>

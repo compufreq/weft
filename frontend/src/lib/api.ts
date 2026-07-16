@@ -101,6 +101,40 @@ export interface AddInstanceInput {
   api_key?: string;
 }
 
+/** A Weaviate object as returned by the REST objects API. */
+export interface WeaviateObject {
+  id: string;
+  class?: string;
+  properties: Record<string, unknown>;
+  vector?: number[];
+  creationTimeUnix?: number;
+}
+
+export interface ObjectsPage {
+  objects: WeaviateObject[];
+  next_cursor: string | null;
+}
+
+export type SearchInput =
+  | { kind: "bm25"; query: string; limit?: number; tenant?: string }
+  | { kind: "near_text"; query: string; limit?: number; tenant?: string }
+  | { kind: "near_vector"; vector: number[]; limit?: number; tenant?: string }
+  | {
+      kind: "hybrid";
+      query: string;
+      vector?: number[];
+      alpha?: number;
+      limit?: number;
+      tenant?: string;
+    };
+
+export interface SearchHit {
+  id: string;
+  score: number | null;
+  distance: number | null;
+  properties: Record<string, unknown>;
+}
+
 export const api = {
   instances: () => fetchJson<InstanceSummary[]>("/api/v1/instances"),
   addInstance: (input: AddInstanceInput) =>
@@ -122,4 +156,28 @@ export const api = {
   /** Browser-only: URL for the schema JSON download. */
   exportUrl: (instanceId: string) =>
     `/api/v1/instances/${encodeURIComponent(instanceId)}/schema/export`,
+  objects: (
+    instanceId: string,
+    className: string,
+    opts: { cursor?: string; limit?: number; tenant?: string } = {},
+  ) => {
+    const params = new URLSearchParams();
+    if (opts.cursor) params.set("cursor", opts.cursor);
+    if (opts.limit) params.set("limit", String(opts.limit));
+    if (opts.tenant) params.set("tenant", opts.tenant);
+    const qs = params.size > 0 ? `?${params}` : "";
+    return fetchJson<ObjectsPage>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/collections/${encodeURIComponent(className)}/objects${qs}`,
+    );
+  },
+  search: (instanceId: string, className: string, input: SearchInput) =>
+    postJson<{ results: SearchHit[] }>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/collections/${encodeURIComponent(className)}/search`,
+      input,
+    ),
+  /** Browser-only: URL for the NDJSON objects download. */
+  exportObjectsUrl: (instanceId: string, className: string, tenant?: string) => {
+    const qs = tenant ? `?tenant=${encodeURIComponent(tenant)}` : "";
+    return `/api/v1/instances/${encodeURIComponent(instanceId)}/collections/${encodeURIComponent(className)}/export.ndjson${qs}`;
+  },
 };

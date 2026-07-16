@@ -7,6 +7,17 @@ use serde_json::Value;
 use std::time::Duration;
 use url::Url;
 
+/// Parameters for [`WeaviateClient::objects`].
+#[derive(Debug, Clone)]
+pub struct ObjectsQuery<'a> {
+    pub class: &'a str,
+    pub limit: usize,
+    /// Cursor: UUID of the last object of the previous page.
+    pub after: Option<&'a str>,
+    pub tenant: Option<&'a str>,
+    pub include_vector: bool,
+}
+
 /// Client for one Weaviate instance.
 ///
 /// Wraps a pooled [`reqwest::Client`]; cheap to clone via `Arc` at the caller.
@@ -88,6 +99,44 @@ impl WeaviateClient {
     /// field (including ones Weft doesn't type) must round-trip untouched.
     pub async fn schema_raw(&self) -> Result<Value, Error> {
         let resp = self.get(self.url("/v1/schema")?).send().await?;
+        Self::decode(resp).await
+    }
+
+    /// `GET /v1/objects` — list objects of a class with cursor pagination.
+    ///
+    /// Returns the raw response (`{ "objects": [...] }`); pagination uses
+    /// Weaviate's `after` cursor (the last object's UUID), never offsets.
+    pub async fn objects(&self, query: &ObjectsQuery<'_>) -> Result<Value, Error> {
+        let mut url = self.url("/v1/objects")?;
+        {
+            let mut pairs = url.query_pairs_mut();
+            pairs.append_pair("class", query.class);
+            pairs.append_pair("limit", &query.limit.to_string());
+            if let Some(after) = query.after {
+                pairs.append_pair("after", after);
+            }
+            if let Some(tenant) = query.tenant {
+                pairs.append_pair("tenant", tenant);
+            }
+            if query.include_vector {
+                pairs.append_pair("include", "vector");
+            }
+        }
+        let resp = self.get(url).send().await?;
+        Self::decode(resp).await
+    }
+
+    /// `POST /v1/graphql` — run a raw GraphQL query.
+    ///
+    /// Returns the full envelope (`{ "data": ..., "errors": ... }`); callers
+    /// are responsible for inspecting `errors`.
+    pub async fn graphql(&self, query: &str) -> Result<Value, Error> {
+        let body = serde_json::json!({ "query": query });
+        let resp = self
+            .post(self.url("/v1/graphql")?)
+            .json(&body)
+            .send()
+            .await?;
         Self::decode(resp).await
     }
 
@@ -211,6 +260,58 @@ mod tests {
         let client =
             WeaviateClient::new(&server.uri(), Some(SecretString::from("sekrit"))).unwrap();
         assert_eq!(client.meta().await.unwrap().version, "1.37.2");
+    }
+
+    #[tokio::test]
+    async fn objects_builds_cursor_query_params() {
+        use wiremock::matchers::query_param;
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/v1/objects"))
+            .and(query_param("class", "Article"))
+            .and(query_param("limit", "50"))
+            .and(query_param("after", "abc-123"))
+            .and(query_param("tenant", "acme"))
+            .and(query_param("include", "vector"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "objects": [{ "id": "x", "properties": {} }]
+            })))
+            .mount(&server)
+            .await;
+
+        let result = client(&server)
+            .await
+            .objects(&ObjectsQuery {
+                class: "Article",
+                limit: 50,
+                after: Some("abc-123"),
+                tenant: Some("acme"),
+                include_vector: true,
+            })
+            .await
+            .unwrap();
+        assert_eq!(result["objects"].as_array().unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn graphql_posts_query_and_returns_envelope() {
+        use wiremock::matchers::body_string_contains;
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/graphql"))
+            .and(body_string_contains("Get { Article"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "data": { "Get": { "Article": [] } }
+            })))
+            .mount(&server)
+            .await;
+
+        let envelope = client(&server)
+            .await
+            .graphql("{ Get { Article(limit: 1) { title } } }")
+            .await
+            .unwrap();
+        assert!(envelope["data"]["Get"]["Article"].is_array());
     }
 
     #[tokio::test]
