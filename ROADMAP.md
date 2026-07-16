@@ -20,7 +20,7 @@ Multi-instance registry (config + runtime add), schema detail views (properties,
 ### v0.3.0 — Data explorer *(shipped 2026-07-16)*
 Cursor-paginated object browser (virtualized), JSON detail drawer, BM25 / nearVector / nearText / hybrid search with scores, NDJSON streaming export.
 
-### v0.4.0 — Multi-tenancy
+### v0.4.0 — Multi-tenancy *(shipped 2026-07-16)*
 Tenant list/filter, HOT/COLD activation, per-tenant object counts, tenant-scoped explorer, bulk tenant operations.
 
 ### v0.5.0 — Ops dashboard
