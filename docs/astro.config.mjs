@@ -38,6 +38,10 @@ export default defineConfig({
               label: "v0.3 — Data explorer",
               slug: "walkthroughs/phase-2-data-explorer",
             },
+            {
+              label: "v0.4 — Multi-tenancy",
+              slug: "walkthroughs/phase-3-multi-tenancy",
+            },
           ],
         },
       ],

@@ -135,6 +135,13 @@ export interface SearchHit {
   properties: Record<string, unknown>;
 }
 
+export interface Tenant {
+  name: string;
+  activityStatus: "HOT" | "COLD" | string;
+  /** Object count — only fetched for HOT tenants when counts=true. */
+  count?: number | null;
+}
+
 export const api = {
   instances: () => fetchJson<InstanceSummary[]>("/api/v1/instances"),
   addInstance: (input: AddInstanceInput) =>
@@ -174,6 +181,28 @@ export const api = {
     postJson<{ results: SearchHit[] }>(
       `/api/v1/instances/${encodeURIComponent(instanceId)}/collections/${encodeURIComponent(className)}/search`,
       input,
+    ),
+  tenants: (instanceId: string, className: string, counts = true) =>
+    fetchJson<{ tenants: Tenant[] }>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/collections/${encodeURIComponent(className)}/tenants${counts ? "?counts=true" : ""}`,
+    ),
+  createTenants: (instanceId: string, className: string, names: string[]) =>
+    postJson<unknown>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/collections/${encodeURIComponent(className)}/tenants`,
+      { names },
+    ),
+  updateTenants: (
+    instanceId: string,
+    className: string,
+    updates: { name: string; status: "HOT" | "COLD" }[],
+  ) =>
+    fetchJson<unknown>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/collections/${encodeURIComponent(className)}/tenants`,
+      {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ updates }),
+      },
     ),
   /** Browser-only: URL for the NDJSON objects download. */
   exportObjectsUrl: (instanceId: string, className: string, tenant?: string) => {

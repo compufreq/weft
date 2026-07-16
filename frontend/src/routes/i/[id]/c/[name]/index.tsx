@@ -66,12 +66,22 @@ export default function ClassDetailPage() {
                     </span>
                   </Show>
                 </div>
-                <A
-                  href={`/i/${params.id}/c/${encodeURIComponent(c().class)}/objects`}
-                  class="rounded-lg bg-weft-600 px-4 py-2 text-sm font-medium text-white hover:bg-weft-700"
-                >
-                  Browse objects →
-                </A>
+                <div class="flex gap-2">
+                  <Show when={c().multiTenancyConfig?.enabled}>
+                    <A
+                      href={`/i/${params.id}/c/${encodeURIComponent(c().class)}/tenants`}
+                      class="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium hover:border-weft-400 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-weft-500"
+                    >
+                      Tenants
+                    </A>
+                  </Show>
+                  <A
+                    href={`/i/${params.id}/c/${encodeURIComponent(c().class)}/objects`}
+                    class="rounded-lg bg-weft-600 px-4 py-2 text-sm font-medium text-white hover:bg-weft-700"
+                  >
+                    Browse objects →
+                  </A>
+                </div>
               </div>
               <Show when={c().description}>
                 <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{c().description}</p>

@@ -55,6 +55,12 @@ pub fn app_with_proxy(state: AppState, ssr: Option<SsrProxy>) -> Router {
             "/api/v1/instances/{id}/collections/{class}/export.ndjson",
             get(api::objects::export),
         )
+        .route(
+            "/api/v1/instances/{id}/collections/{class}/tenants",
+            get(api::tenants::list)
+                .post(api::tenants::create)
+                .put(api::tenants::update),
+        )
         .layer(TraceLayer::new_for_http())
         .layer(CompressionLayer::new())
         // NOTE: no server-side TimeoutLayer needed — upstream calls are already

@@ -1,4 +1,4 @@
-import { A, useParams } from "@solidjs/router";
+import { A, useParams, useSearchParams } from "@solidjs/router";
 import { createSignal, Match, onMount, Show, Switch } from "solid-js";
 import ObjectsTable from "~/components/explorer/ObjectsTable";
 import SearchResults from "~/components/explorer/SearchResults";
@@ -17,8 +17,11 @@ export default function ObjectsPage() {
   const instanceId = () => params.id ?? "";
   const className = () => params.name ?? "";
 
+  const [searchParams] = useSearchParams();
   const [mode, setMode] = createSignal<Mode>("browse");
-  const [tenant, setTenant] = createSignal("");
+  // Deep-linkable: /objects?tenant=acme preselects the tenant.
+  const initialTenant = typeof searchParams.tenant === "string" ? searchParams.tenant : "";
+  const [tenant, setTenant] = createSignal(initialTenant);
   const [selected, setSelected] = createSignal<WeaviateObject | SearchHit | null>(null);
 
   // --- browse state: accumulated pages ---

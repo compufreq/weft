@@ -177,6 +177,30 @@ impl WeaviateClient {
             .await?;
         Self::decode(resp).await
     }
+
+    /// `GET /v1/schema/{class}/tenants` — list tenants with activity status.
+    pub async fn tenants(&self, class: &str) -> Result<Value, Error> {
+        let resp = self
+            .get(self.url(&format!("/v1/schema/{class}/tenants"))?)
+            .send()
+            .await?;
+        Self::decode(resp).await
+    }
+
+    /// `PUT /v1/schema/{class}/tenants` — update tenants (e.g. activity status).
+    ///
+    /// Each entry is `{ "name": ..., "activityStatus": "HOT" | "COLD" }`.
+    pub async fn update_tenants(&self, class: &str, tenants: &[Value]) -> Result<Value, Error> {
+        let req = self
+            .http
+            .put(self.url(&format!("/v1/schema/{class}/tenants"))?);
+        let req = match &self.api_key {
+            Some(key) => req.bearer_auth(key.expose_secret()),
+            None => req,
+        };
+        let resp = req.json(&tenants).send().await?;
+        Self::decode(resp).await
+    }
 }
 
 #[cfg(test)]
@@ -260,6 +284,42 @@ mod tests {
         let client =
             WeaviateClient::new(&server.uri(), Some(SecretString::from("sekrit"))).unwrap();
         assert_eq!(client.meta().await.unwrap().version, "1.37.2");
+    }
+
+    #[tokio::test]
+    async fn tenants_list_and_update_roundtrip() {
+        use wiremock::matchers::body_string_contains;
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/v1/schema/Product/tenants"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "name": "acme", "activityStatus": "HOT" },
+                { "name": "globex", "activityStatus": "COLD" }
+            ])))
+            .mount(&server)
+            .await;
+        Mock::given(method("PUT"))
+            .and(path("/v1/schema/Product/tenants"))
+            .and(body_string_contains("\"activityStatus\":\"COLD\""))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                { "name": "acme", "activityStatus": "COLD" }
+            ])))
+            .mount(&server)
+            .await;
+
+        let c = client(&server).await;
+        let list = c.tenants("Product").await.unwrap();
+        assert_eq!(list.as_array().unwrap().len(), 2);
+        assert_eq!(list[0]["activityStatus"], "HOT");
+
+        let updated = c
+            .update_tenants(
+                "Product",
+                &[serde_json::json!({ "name": "acme", "activityStatus": "COLD" })],
+            )
+            .await
+            .unwrap();
+        assert_eq!(updated[0]["activityStatus"], "COLD");
     }
 
     #[tokio::test]

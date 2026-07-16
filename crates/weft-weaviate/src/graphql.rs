@@ -107,9 +107,34 @@ pub fn build_get(
     ))
 }
 
+/// Build an `Aggregate` count query (optionally tenant-scoped).
+pub fn build_count(class: &str, tenant: Option<&str>) -> Result<String, BuildError> {
+    let class = ident(class)?;
+    let args = match tenant {
+        Some(t) => format!("(tenant: {})", encode_str(t)),
+        None => String::new(),
+    };
+    Ok(format!(
+        "{{ Aggregate {{ {class}{args} {{ meta {{ count }} }} }} }}"
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn count_query_with_and_without_tenant() {
+        assert_eq!(
+            build_count("Product", Some("acme")).unwrap(),
+            "{ Aggregate { Product(tenant: \"acme\") { meta { count } } } }"
+        );
+        assert_eq!(
+            build_count("Article", None).unwrap(),
+            "{ Aggregate { Article { meta { count } } } }"
+        );
+        assert!(build_count("Bad Name", None).is_err());
+    }
 
     #[test]
     fn bm25_query_shape() {
