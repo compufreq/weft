@@ -38,8 +38,8 @@ arm64 image (native GitHub arm runners, multi-arch manifest on GHCR), docs revie
 ### v0.9.0 — Explorer completeness *(shipped 2026-07-16)*
 Where-filter builder on the object browser and search, aggregations (counts + per-property facets), raw GraphQL query console (read-safe: Weaviate's GraphQL API is query-only), read-only-mode fix for non-mutating POST endpoints.
 
-### v0.10.0 — Data write path
-Object create / edit / delete from the UI, JSON/NDJSON and CSV import with batch progress — all blocked in read-only deployments.
+### v0.10.0 — Data write path *(shipped 2026-07-16)*
+Object create / edit / delete from the UI, JSON/NDJSON batch import with per-item error reports — all blocked in read-only deployments (CSV import: v0.10.x follow-up).
 
 ### v0.11.0 — Schema management & aliases
 Collection create (guided form + raw JSON), add property, collection delete behind confirmation, collection alias CRUD (Weaviate ≥1.32), persisted runtime instances (volume-backed).

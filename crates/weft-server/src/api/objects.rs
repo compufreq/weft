@@ -357,6 +357,197 @@ pub async fn aggregate(
     ))
 }
 
+/// Validate a UUID-ish object id before it lands in a URL path.
+fn valid_object_id(id: &str) -> Result<(), ApiError> {
+    let ok = !id.is_empty()
+        && id.len() <= 64
+        && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-');
+    if ok {
+        Ok(())
+    } else {
+        Err(ApiError::InvalidInput(format!(
+            "`{id}` is not a valid object id"
+        )))
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ObjectWrite {
+    pub properties: Value,
+    pub id: Option<String>,
+    pub tenant: Option<String>,
+    pub vector: Option<Vec<f64>>,
+}
+
+fn object_body(class: &str, write: &ObjectWrite, id: Option<&str>) -> Result<Value, ApiError> {
+    if !write.properties.is_object() {
+        return Err(ApiError::InvalidInput(
+            "`properties` must be an object".into(),
+        ));
+    }
+    let mut body = json!({ "class": class, "properties": write.properties });
+    if let Some(id) = id.or(write.id.as_deref()) {
+        valid_object_id(id)?;
+        body["id"] = json!(id);
+    }
+    if let Some(t) = &write.tenant {
+        body["tenant"] = json!(t);
+    }
+    if let Some(v) = &write.vector {
+        body["vector"] = json!(v);
+    }
+    Ok(body)
+}
+
+/// `POST /api/v1/instances/{id}/collections/{class}/objects` — create one object.
+pub async fn create(
+    State(state): State<AppState>,
+    Path((id, class)): Path<(String, String)>,
+    Json(body): Json<ObjectWrite>,
+) -> Result<Json<Value>, ApiError> {
+    let instance = state
+        .instance(&id)
+        .ok_or_else(|| ApiError::InstanceNotFound(id))?;
+    let payload = object_body(&class, &body, None)?;
+    let created = instance.client.create_object(&payload).await?;
+    Ok(Json(created))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SingleObjectParams {
+    pub tenant: Option<String>,
+}
+
+/// `GET /api/v1/instances/{id}/collections/{class}/objects/{uuid}` — one object.
+pub async fn get_one(
+    State(state): State<AppState>,
+    Path((id, class, uuid)): Path<(String, String, String)>,
+    Query(params): Query<SingleObjectParams>,
+) -> Result<Json<Value>, ApiError> {
+    let instance = state
+        .instance(&id)
+        .ok_or_else(|| ApiError::InstanceNotFound(id))?;
+    valid_object_id(&uuid)?;
+    let obj = instance
+        .client
+        .get_object(&class, &uuid, params.tenant.as_deref())
+        .await?;
+    Ok(Json(obj))
+}
+
+/// `PUT /api/v1/instances/{id}/collections/{class}/objects/{uuid}` — replace
+/// an object's properties (Weaviate PUT semantics: full replacement).
+pub async fn replace(
+    State(state): State<AppState>,
+    Path((id, class, uuid)): Path<(String, String, String)>,
+    Json(body): Json<ObjectWrite>,
+) -> Result<Json<Value>, ApiError> {
+    let instance = state
+        .instance(&id)
+        .ok_or_else(|| ApiError::InstanceNotFound(id))?;
+    valid_object_id(&uuid)?;
+    let payload = object_body(&class, &body, Some(&uuid))?;
+    let updated = instance
+        .client
+        .replace_object(&class, &uuid, &payload)
+        .await?;
+    Ok(Json(updated))
+}
+
+/// `DELETE /api/v1/instances/{id}/collections/{class}/objects/{uuid}`
+pub async fn delete_one(
+    State(state): State<AppState>,
+    Path((id, class, uuid)): Path<(String, String, String)>,
+    Query(params): Query<SingleObjectParams>,
+) -> Result<axum::http::StatusCode, ApiError> {
+    let instance = state
+        .instance(&id)
+        .ok_or_else(|| ApiError::InstanceNotFound(id))?;
+    valid_object_id(&uuid)?;
+    instance
+        .client
+        .delete_object(&class, &uuid, params.tenant.as_deref())
+        .await?;
+    Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+/// Import limits: bounded request, paged batches, capped error list.
+const IMPORT_MAX_OBJECTS: usize = 10_000;
+const IMPORT_BATCH: usize = 100;
+const IMPORT_MAX_ERRORS: usize = 20;
+
+#[derive(Debug, Deserialize)]
+pub struct ImportRequest {
+    /// Objects to insert; each entry: `{ properties, id?, vector? }`.
+    pub objects: Vec<ObjectWrite>,
+    pub tenant: Option<String>,
+}
+
+/// `POST /api/v1/instances/{id}/collections/{class}/import` — batch insert
+/// with a per-item outcome report. Blocked in read-only mode like every
+/// other mutation.
+pub async fn import(
+    State(state): State<AppState>,
+    Path((id, class)): Path<(String, String)>,
+    Json(body): Json<ImportRequest>,
+) -> Result<Json<Value>, ApiError> {
+    let instance = state
+        .instance(&id)
+        .ok_or_else(|| ApiError::InstanceNotFound(id))?;
+    if body.objects.is_empty() {
+        return Err(ApiError::InvalidInput("no objects to import".into()));
+    }
+    if body.objects.len() > IMPORT_MAX_OBJECTS {
+        return Err(ApiError::InvalidInput(format!(
+            "import is capped at {IMPORT_MAX_OBJECTS} objects per request"
+        )));
+    }
+
+    let mut payloads = Vec::with_capacity(body.objects.len());
+    for write in &body.objects {
+        let mut w = object_body(&class, write, None)?;
+        // The request-level tenant wins; per-object tenants are not a thing
+        // in one import.
+        if let Some(t) = &body.tenant {
+            w["tenant"] = json!(t);
+        }
+        payloads.push(w);
+    }
+
+    let mut inserted = 0usize;
+    let mut failed = 0usize;
+    let mut errors: Vec<Value> = Vec::new();
+
+    for (chunk_no, chunk) in payloads.chunks(IMPORT_BATCH).enumerate() {
+        let results = instance.client.batch_objects(chunk).await?;
+        let items = results.as_array().cloned().unwrap_or_default();
+        for (i, item) in items.iter().enumerate() {
+            let status = item["result"]["status"].as_str().unwrap_or("SUCCESS");
+            if status == "FAILED" {
+                failed += 1;
+                if errors.len() < IMPORT_MAX_ERRORS {
+                    let message = item["result"]["errors"]["error"][0]["message"]
+                        .as_str()
+                        .unwrap_or("unknown error");
+                    errors.push(json!({
+                        "index": chunk_no * IMPORT_BATCH + i,
+                        "message": message,
+                    }));
+                }
+            } else {
+                inserted += 1;
+            }
+        }
+    }
+
+    Ok(Json(json!({
+        "inserted": inserted,
+        "failed": failed,
+        "errors": errors,
+        "errors_truncated": failed > errors.len(),
+    })))
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ExportParams {
     pub tenant: Option<String>,

@@ -398,3 +398,151 @@ fn url_encode(s: &str) -> String {
     }
     out
 }
+
+// ---------- object CRUD + import (v0.10) ----------
+// These tests use their own collections (set up via the weaviate client
+// directly) so they can't disturb the seeded Article counts that other
+// tests assert in parallel.
+
+async fn ensure_class(name: &str) -> weft_weaviate::WeaviateClient {
+    let client = weft_weaviate::WeaviateClient::new(&weaviate_url(), None).unwrap();
+    let _ = client.delete_class(name).await; // clean slate; ignore 4xx
+    client
+        .create_class(&serde_json::json!({
+            "class": name,
+            "vectorizer": "none",
+            "properties": [
+                { "name": "title", "dataType": ["text"] },
+                { "name": "wordCount", "dataType": ["int"] }
+            ]
+        }))
+        .await
+        .expect("create test class");
+    client
+}
+
+async fn delete(path: &str) -> StatusCode {
+    let response = test_app()
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri(path)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    response.status()
+}
+
+async fn put(path: &str, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
+    let response = test_app()
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(path)
+                .header("content-type", "application/json")
+                .body(Body::from(body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = response.status();
+    let bytes = response.into_body().collect().await.unwrap().to_bytes();
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
+}
+
+#[tokio::test]
+async fn object_crud_roundtrip() {
+    let cleanup = ensure_class("WeftCrudTest").await;
+    let base = "/api/v1/instances/local/collections/WeftCrudTest/objects";
+
+    // Create.
+    let (status, created) = post(
+        base,
+        serde_json::json!({ "properties": { "title": "first", "wordCount": 5 } }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{created}");
+    let id = created["id"].as_str().expect("created id").to_string();
+
+    // Read.
+    let (status, fetched) = get(&format!("{base}/{id}")).await;
+    assert_eq!(status, StatusCode::OK, "{fetched}");
+    assert_eq!(fetched["properties"]["title"], "first");
+
+    // Replace.
+    let (status, updated) = put(
+        &format!("{base}/{id}"),
+        serde_json::json!({ "properties": { "title": "second", "wordCount": 9 } }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{updated}");
+    let (_, refetched) = get(&format!("{base}/{id}")).await;
+    assert_eq!(refetched["properties"]["title"], "second");
+    assert_eq!(refetched["properties"]["wordCount"], 9);
+
+    // Delete → gone.
+    assert_eq!(
+        delete(&format!("{base}/{id}")).await,
+        StatusCode::NO_CONTENT
+    );
+    let (status, _) = get(&format!("{base}/{id}")).await;
+    assert_eq!(
+        status,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "404 from weaviate maps to 422"
+    );
+
+    // Bad ids are rejected before touching Weaviate.
+    let (status, _) = get(&format!("{base}/..%2Fetc")).await;
+    assert_ne!(status, StatusCode::OK);
+
+    let _ = cleanup.delete_class("WeftCrudTest").await;
+}
+
+#[tokio::test]
+async fn import_reports_per_item_outcomes() {
+    let cleanup = ensure_class("WeftImportTest").await;
+
+    // Two good objects, one with a type-mismatched property (fails per-item).
+    let (status, report) = post(
+        "/api/v1/instances/local/collections/WeftImportTest/import",
+        serde_json::json!({
+            "objects": [
+                { "properties": { "title": "a", "wordCount": 1 } },
+                { "properties": { "title": "b", "wordCount": "not-a-number" } },
+                { "properties": { "title": "c", "wordCount": 3 } }
+            ]
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{report}");
+    assert_eq!(report["inserted"], 2, "{report}");
+    assert_eq!(report["failed"], 1, "{report}");
+    let errors = report["errors"].as_array().unwrap();
+    assert_eq!(errors.len(), 1);
+    assert_eq!(errors[0]["index"], 1);
+    assert!(errors[0]["message"].as_str().unwrap().len() > 3);
+
+    // Imported objects are actually queryable.
+    let (_, agg) = post(
+        "/api/v1/instances/local/collections/WeftImportTest/aggregate",
+        serde_json::json!({}),
+    )
+    .await;
+    assert_eq!(agg["count"], 2, "{agg}");
+
+    // Empty import is a clean 422.
+    let (status, _) = post(
+        "/api/v1/instances/local/collections/WeftImportTest/import",
+        serde_json::json!({ "objects": [] }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+
+    let _ = cleanup.delete_class("WeftImportTest").await;
+}

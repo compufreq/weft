@@ -173,6 +173,13 @@ export interface AggregateResult {
   groups_truncated?: boolean;
 }
 
+export interface ImportReport {
+  inserted: number;
+  failed: number;
+  errors: { index: number; message: string }[];
+  errors_truncated?: boolean;
+}
+
 export interface SearchHit {
   id: string;
   score: number | null;
@@ -253,6 +260,46 @@ export const api = {
   search: (instanceId: string, className: string, input: SearchInput) =>
     postJson<{ results: SearchHit[] }>(
       `/api/v1/instances/${encodeURIComponent(instanceId)}/collections/${encodeURIComponent(className)}/search`,
+      input,
+    ),
+  createObject: (
+    instanceId: string,
+    className: string,
+    input: { properties: Record<string, unknown>; id?: string; tenant?: string; vector?: number[] },
+  ) =>
+    postJson<WeaviateObject>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/collections/${encodeURIComponent(className)}/objects`,
+      input,
+    ),
+  replaceObject: (
+    instanceId: string,
+    className: string,
+    uuid: string,
+    input: { properties: Record<string, unknown>; tenant?: string; vector?: number[] },
+  ) =>
+    fetchJson<WeaviateObject>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/collections/${encodeURIComponent(className)}/objects/${encodeURIComponent(uuid)}`,
+      {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(input),
+      },
+    ),
+  deleteObject: (instanceId: string, className: string, uuid: string, tenant?: string) =>
+    fetchJson<void>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/collections/${encodeURIComponent(className)}/objects/${encodeURIComponent(uuid)}${tenant ? `?tenant=${encodeURIComponent(tenant)}` : ""}`,
+      { method: "DELETE" },
+    ),
+  importObjects: (
+    instanceId: string,
+    className: string,
+    input: {
+      objects: { properties: Record<string, unknown>; id?: string; vector?: number[] }[];
+      tenant?: string;
+    },
+  ) =>
+    postJson<ImportReport>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/collections/${encodeURIComponent(className)}/import`,
       input,
     ),
   aggregate: (

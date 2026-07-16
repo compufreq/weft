@@ -197,6 +197,89 @@ impl WeaviateClient {
         }
     }
 
+    fn put(&self, url: Url) -> reqwest::RequestBuilder {
+        let req = self.http.put(url);
+        match &self.api_key {
+            Some(key) => req.bearer_auth(key.expose_secret()),
+            None => req,
+        }
+    }
+
+    fn delete(&self, url: Url) -> reqwest::RequestBuilder {
+        let req = self.http.delete(url);
+        match &self.api_key {
+            Some(key) => req.bearer_auth(key.expose_secret()),
+            None => req,
+        }
+    }
+
+    fn object_url(&self, class: &str, id: &str, tenant: Option<&str>) -> Result<Url, Error> {
+        let mut url = self.url(&format!("/v1/objects/{class}/{id}"))?;
+        if let Some(t) = tenant {
+            url.query_pairs_mut().append_pair("tenant", t);
+        }
+        Ok(url)
+    }
+
+    /// `GET /v1/objects/{class}/{id}` — fetch one object.
+    pub async fn get_object(
+        &self,
+        class: &str,
+        id: &str,
+        tenant: Option<&str>,
+    ) -> Result<Value, Error> {
+        let resp = self.get(self.object_url(class, id, tenant)?).send().await?;
+        Self::decode(resp).await
+    }
+
+    /// `POST /v1/objects` — create one object. The raw body carries `class`,
+    /// `properties`, and optionally `id` / `tenant` / `vector`.
+    pub async fn create_object(&self, object: &Value) -> Result<Value, Error> {
+        let resp = self
+            .post(self.url("/v1/objects")?)
+            .json(object)
+            .send()
+            .await?;
+        Self::decode(resp).await
+    }
+
+    /// `PUT /v1/objects/{class}/{id}` — replace an object's properties.
+    pub async fn replace_object(
+        &self,
+        class: &str,
+        id: &str,
+        object: &Value,
+    ) -> Result<Value, Error> {
+        let resp = self
+            .put(self.object_url(class, id, None)?)
+            .json(object)
+            .send()
+            .await?;
+        Self::decode(resp).await
+    }
+
+    /// `DELETE /v1/objects/{class}/{id}` — delete one object.
+    pub async fn delete_object(
+        &self,
+        class: &str,
+        id: &str,
+        tenant: Option<&str>,
+    ) -> Result<(), Error> {
+        let resp = self
+            .delete(self.object_url(class, id, tenant)?)
+            .send()
+            .await?;
+        let status = resp.status();
+        if status.is_success() {
+            Ok(())
+        } else {
+            Err(Error::Status {
+                status,
+                body: resp.text().await.unwrap_or_default(),
+            })
+        }
+    }
+
     /// `GET /v1/nodes?output=verbose` — cluster node and shard health.
     pub async fn nodes(&self) -> Result<Value, Error> {
         let mut url = self.url("/v1/nodes")?;

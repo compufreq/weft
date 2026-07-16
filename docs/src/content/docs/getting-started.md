@@ -50,6 +50,7 @@ The image is published for **amd64 and arm64** (Apple Silicon, Raspberry Pi 5, G
 - **Manage connections** — register multiple Weaviate instances at runtime
 - **Export & diff schemas** — one-click JSON download; compare two instances, or an instance against an earlier export
 - **Explore objects** — cursor-paginated browser with a JSON detail panel and streaming NDJSON export
+- **Edit data** — create, edit, and delete objects from the UI; batch-import JSON/NDJSON with per-item error reports (all disabled in read-only mode)
 - **Filter & aggregate** — structured where-filters on browse and search, live counts, per-property facets
 - **Search** — BM25, nearVector, nearText, and hybrid, with scores
 - **Query console** — raw GraphQL scratchpad per instance (query-only, safe in read-only mode)

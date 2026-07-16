@@ -1,6 +1,9 @@
 import { A, useParams, useSearchParams } from "@solidjs/router";
 import { createSignal, Match, onMount, Show, Switch } from "solid-js";
+import { useAuth } from "~/components/AuthGate";
 import AggregatePanel from "~/components/explorer/AggregatePanel";
+import ImportPanel from "~/components/explorer/ImportPanel";
+import ObjectEditor from "~/components/explorer/ObjectEditor";
 import FilterBuilder, {
   rowValue,
   valueTypeFor,
@@ -18,7 +21,7 @@ import {
   type WhereFilter,
 } from "~/lib/api";
 
-type Mode = "browse" | "search";
+type Mode = "browse" | "search" | "import";
 type SearchKind = "bm25" | "hybrid" | "near_text" | "near_vector";
 
 export default function ObjectsPage() {
@@ -28,6 +31,11 @@ export default function ObjectsPage() {
 
   const [searchParams] = useSearchParams();
   const [mode, setMode] = createSignal<Mode>("browse");
+  const auth = useAuth();
+  const readOnly = () => auth?.status()?.read_only ?? false;
+  // null = closed, "new" = create, otherwise the object being edited.
+  const [editing, setEditing] = createSignal<"new" | WeaviateObject | SearchHit | null>(null);
+  const [writeError, setWriteError] = createSignal<string | null>(null);
   // Deep-linkable: /objects?tenant=acme preselects the tenant.
   const initialTenant = typeof searchParams.tenant === "string" ? searchParams.tenant : "";
   const [tenant, setTenant] = createSignal(initialTenant);
@@ -188,6 +196,37 @@ export default function ObjectsPage() {
   const needsQuery = () => kind() !== "near_vector";
   const needsVector = () => kind() === "near_vector" || kind() === "hybrid";
 
+  // --- write path (hidden on read-only deployments) ---
+  const saveObject = async (properties: Record<string, unknown>) => {
+    const current = editing();
+    if (current === "new") {
+      await api.createObject(instanceId(), className(), {
+        properties,
+        tenant: tenant() || undefined,
+      });
+    } else if (current) {
+      await api.replaceObject(instanceId(), className(), current.id, {
+        properties,
+        tenant: tenant() || undefined,
+      });
+    }
+    setEditing(null);
+    setSelected(null);
+    await loadPage(true);
+  };
+
+  const deleteObject = async (obj: WeaviateObject | SearchHit) => {
+    if (!confirm(`Delete object ${obj.id}? This cannot be undone.`)) return;
+    setWriteError(null);
+    try {
+      await api.deleteObject(instanceId(), className(), obj.id, tenant() || undefined);
+      setSelected(null);
+      await loadPage(true);
+    } catch (err) {
+      setWriteError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
   return (
     <section aria-labelledby="objects-heading">
       <nav aria-label="Breadcrumb" class="text-sm text-zinc-500 dark:text-zinc-400">
@@ -217,6 +256,15 @@ export default function ObjectsPage() {
           {className()} objects
         </h1>
         <div class="flex items-center gap-2">
+          <Show when={!readOnly()}>
+            <button
+              type="button"
+              onClick={() => setEditing("new")}
+              class="rounded-lg bg-weft-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-weft-700"
+            >
+              New object
+            </button>
+          </Show>
           <input
             aria-label="Tenant (for multi-tenant collections)"
             placeholder="tenant (optional)"
@@ -260,7 +308,30 @@ export default function ObjectsPage() {
         >
           Search
         </button>
+        <Show when={!readOnly()}>
+          <button
+            role="tab"
+            aria-selected={mode() === "import"}
+            onClick={() => setMode("import")}
+            class={`rounded-t-lg px-4 py-2 text-sm font-medium ${
+              mode() === "import"
+                ? "border-b-2 border-weft-500 text-weft-600 dark:text-weft-400"
+                : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+            }`}
+          >
+            Import
+          </button>
+        </Show>
       </div>
+
+      <Show when={writeError()}>
+        <div
+          role="alert"
+          class="mt-4 rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200"
+        >
+          {writeError()}
+        </div>
+      </Show>
 
       <div class="mt-4">
         <FilterBuilder
@@ -404,43 +475,92 @@ export default function ObjectsPage() {
                 )}
               </Show>
             </Match>
+
+            <Match when={mode() === "import"}>
+              <ImportPanel
+                onImport={(objects) =>
+                  api
+                    .importObjects(instanceId(), className(), {
+                      objects,
+                      tenant: tenant() || undefined,
+                    })
+                    .then((report) => {
+                      void loadPage(true);
+                      return report;
+                    })
+                }
+              />
+            </Match>
           </Switch>
         </div>
 
         <div aria-label="Object detail" class="min-w-0">
-          <Show
-            when={selected()}
-            fallback={
+          <Switch>
+            <Match when={editing() === "new"}>
+              <ObjectEditor
+                heading="New object"
+                onSave={saveObject}
+                onCancel={() => setEditing(null)}
+              />
+            </Match>
+            <Match when={editing() && editing() !== "new"}>
+              <ObjectEditor
+                heading="Edit object"
+                initial={(editing() as WeaviateObject).properties}
+                onSave={saveObject}
+                onCancel={() => setEditing(null)}
+              />
+            </Match>
+            <Match when={selected()}>
+              {(sel) => (
+                <div class="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+                  <div class="flex items-center justify-between gap-2 border-b border-zinc-200 px-4 py-2.5 dark:border-zinc-800">
+                    <h2 class="text-sm font-medium">Object</h2>
+                    <div class="flex items-center gap-1.5">
+                      <Show when={!readOnly()}>
+                        <button
+                          type="button"
+                          onClick={() => setEditing(sel())}
+                          class="rounded-lg border border-zinc-300 px-2.5 py-1 text-xs font-medium hover:border-weft-400 dark:border-zinc-700 dark:hover:border-weft-500"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void deleteObject(sel())}
+                          class="rounded-lg border border-red-300 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950"
+                        >
+                          Delete
+                        </button>
+                      </Show>
+                      <button
+                        type="button"
+                        aria-label="Close detail"
+                        onClick={() => setSelected(null)}
+                        class="rounded px-2 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                  {/* tabindex: keyboard users must be able to scroll the JSON */}
+                  <pre
+                    tabindex="0"
+                    role="region"
+                    aria-label="Object JSON"
+                    class="max-h-[32rem] overflow-auto p-4 text-xs leading-relaxed focus-visible:outline-2 focus-visible:outline-weft-500"
+                  >
+                    {JSON.stringify(sel(), null, 2)}
+                  </pre>
+                </div>
+              )}
+            </Match>
+            <Match when={true}>
               <p class="rounded-lg border border-dashed border-zinc-300 p-6 text-center text-xs text-zinc-400 dark:border-zinc-700 dark:text-zinc-400">
                 Select an object to inspect it.
               </p>
-            }
-          >
-            {(sel) => (
-              <div class="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-                <div class="flex items-center justify-between border-b border-zinc-200 px-4 py-2.5 dark:border-zinc-800">
-                  <h2 class="text-sm font-medium">Object</h2>
-                  <button
-                    type="button"
-                    aria-label="Close detail"
-                    onClick={() => setSelected(null)}
-                    class="rounded px-2 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
-                  >
-                    ×
-                  </button>
-                </div>
-                {/* tabindex: keyboard users must be able to scroll the JSON */}
-                <pre
-                  tabindex="0"
-                  role="region"
-                  aria-label="Object JSON"
-                  class="max-h-[32rem] overflow-auto p-4 text-xs leading-relaxed focus-visible:outline-2 focus-visible:outline-weft-500"
-                >
-                  {JSON.stringify(sel(), null, 2)}
-                </pre>
-              </div>
-            )}
-          </Show>
+            </Match>
+          </Switch>
         </div>
       </div>
     </section>

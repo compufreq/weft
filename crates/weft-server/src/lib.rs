@@ -50,7 +50,17 @@ pub fn app_with_proxy(state: AppState, ssr: Option<SsrProxy>) -> Router {
         )
         .route(
             "/api/v1/instances/{id}/collections/{class}/objects",
-            get(api::objects::list),
+            get(api::objects::list).post(api::objects::create),
+        )
+        .route(
+            "/api/v1/instances/{id}/collections/{class}/objects/{uuid}",
+            get(api::objects::get_one)
+                .put(api::objects::replace)
+                .delete(api::objects::delete_one),
+        )
+        .route(
+            "/api/v1/instances/{id}/collections/{class}/import",
+            post(api::objects::import),
         )
         .route(
             "/api/v1/instances/{id}/collections/{class}/search",

@@ -293,14 +293,19 @@ async fn read_only_allows_query_posts() {
         );
     }
 
-    // Mutating POSTs stay blocked.
-    let (status, _, _) = send(
-        &app,
-        "POST",
-        "/api/v1/instances",
-        &[],
-        Some(serde_json::json!({ "name": "X", "url": "http://x:1" })),
-    )
-    .await;
-    assert_eq!(status, StatusCode::FORBIDDEN);
+    // Mutating requests stay blocked — including the v0.10 write path.
+    for (method, path) in [
+        ("POST", "/api/v1/instances"),
+        ("POST", "/api/v1/instances/x/collections/C/objects"),
+        ("PUT", "/api/v1/instances/x/collections/C/objects/u-1"),
+        ("DELETE", "/api/v1/instances/x/collections/C/objects/u-1"),
+        ("POST", "/api/v1/instances/x/collections/C/import"),
+    ] {
+        let (status, body, _) = send(&app, method, path, &[], Some(serde_json::json!({}))).await;
+        assert_eq!(
+            status,
+            StatusCode::FORBIDDEN,
+            "read-only must block {method} {path}: {body}"
+        );
+    }
 }
