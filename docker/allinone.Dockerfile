@@ -4,6 +4,7 @@
 
 # --- Stage 1: Rust backend (static musl binary) ---
 FROM rust:1.92-alpine AS backend
+# hadolint ignore=DL3018
 RUN apk add --no-cache musl-dev
 WORKDIR /build
 COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
@@ -21,6 +22,7 @@ RUN npm run build
 
 # --- Final: node runtime + rust binary, tini as PID 1 ---
 FROM node:26-alpine
+# hadolint ignore=DL3018
 RUN apk add --no-cache --upgrade tini \
     && apk upgrade --no-cache \
     && addgroup -S weft && adduser -S weft -G weft
