@@ -84,6 +84,13 @@ impl WeaviateClient {
         Self::decode(resp).await
     }
 
+    /// `GET /v1/schema` as raw JSON — used for export and diff, where every
+    /// field (including ones Weft doesn't type) must round-trip untouched.
+    pub async fn schema_raw(&self) -> Result<Value, Error> {
+        let resp = self.get(self.url("/v1/schema")?).send().await?;
+        Self::decode(resp).await
+    }
+
     /// `POST /v1/schema` — create a collection from a raw class definition.
     ///
     /// Takes a raw [`Value`] on purpose: the seeder and later schema tooling

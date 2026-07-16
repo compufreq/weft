@@ -5,8 +5,9 @@ import type { ClassInfo } from "~/lib/api";
 /**
  * Renders an instance's collections as a table.
  * Pure component (data in via props) so it's unit-testable without a server.
+ * When `instanceId` is set, collection names link to their detail page.
  */
-export default function SchemaTable(props: { classes: ClassInfo[] }) {
+export default function SchemaTable(props: { classes: ClassInfo[]; instanceId?: string }) {
   return (
     <Show
       when={props.classes.length > 0}
@@ -49,7 +50,17 @@ export default function SchemaTable(props: { classes: ClassInfo[] }) {
                   transition={{ duration: 0.25, delay: i() * 0.04 }}
                 >
                   <td class="px-4 py-3">
-                    <span class="font-medium">{cls.class}</span>
+                    <Show
+                      when={props.instanceId}
+                      fallback={<span class="font-medium">{cls.class}</span>}
+                    >
+                      <a
+                        href={`/i/${props.instanceId}/c/${encodeURIComponent(cls.class)}`}
+                        class="font-medium text-weft-600 hover:underline dark:text-weft-400"
+                      >
+                        {cls.class}
+                      </a>
+                    </Show>
                     <Show when={cls.description}>
                       <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
                         {cls.description}

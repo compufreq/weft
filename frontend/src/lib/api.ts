@@ -48,8 +48,8 @@ export class ApiError extends Error {
   }
 }
 
-async function fetchJson<T>(path: string): Promise<T> {
-  const res = await fetch(`${base()}${path}`);
+async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${base()}${path}`, init);
   if (!res.ok) {
     let message = `Request failed with status ${res.status}`;
     try {
@@ -60,11 +60,66 @@ async function fetchJson<T>(path: string): Promise<T> {
     }
     throw new ApiError(res.status, message);
   }
+  if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
+}
+
+function postJson<T>(path: string, body: unknown): Promise<T> {
+  return fetchJson<T>(path, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+/** One entry of a schema diff, mirrored from the backend's DiffEntry enum. */
+export interface DiffEntryT {
+  kind:
+    | "class_added"
+    | "class_removed"
+    | "field_changed"
+    | "property_added"
+    | "property_removed"
+    | "property_field_changed";
+  class: string;
+  field?: string;
+  property?: string;
+  left?: unknown;
+  right?: unknown;
+}
+
+export interface DiffResult {
+  left: string;
+  right: string;
+  entries: DiffEntryT[];
+}
+
+export interface AddInstanceInput {
+  id?: string;
+  name: string;
+  url: string;
+  api_key?: string;
 }
 
 export const api = {
   instances: () => fetchJson<InstanceSummary[]>("/api/v1/instances"),
+  addInstance: (input: AddInstanceInput) =>
+    postJson<InstanceSummary>("/api/v1/instances", input),
+  deleteInstance: (instanceId: string) =>
+    fetchJson<void>(`/api/v1/instances/${encodeURIComponent(instanceId)}`, {
+      method: "DELETE",
+    }),
   schema: (instanceId: string) =>
     fetchJson<Schema>(`/api/v1/instances/${encodeURIComponent(instanceId)}/schema`),
+  diff: (
+    instanceId: string,
+    against: { against_instance?: string; against_schema?: unknown },
+  ) =>
+    postJson<DiffResult>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/schema/diff`,
+      against,
+    ),
+  /** Browser-only: URL for the schema JSON download. */
+  exportUrl: (instanceId: string) =>
+    `/api/v1/instances/${encodeURIComponent(instanceId)}/schema/export`,
 };

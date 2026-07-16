@@ -1,0 +1,46 @@
+# End-to-end verification of the production all-in-one image:
+#   docker compose -f compose.e2e.yaml up --build -d
+#   → UI + API at http://localhost:8280, seeded Weaviate at :8281
+name: weft-e2e
+
+services:
+  weaviate:
+    image: cr.weaviate.io/semitechnologies/weaviate:1.37.2
+    command: ["--host", "0.0.0.0", "--port", "8080", "--scheme", "http"]
+    environment:
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: /var/lib/weaviate
+      DEFAULT_VECTORIZER_MODULE: none
+      CLUSTER_HOSTNAME: node1
+    ports:
+      - "8281:8080"
+
+  seed:
+    build:
+      context: .
+      dockerfile: docker/dev/backend.dev.Dockerfile
+    command: ["cargo", "run", "-p", "xtask", "--", "seed"]
+    environment:
+      WEAVIATE_URL: http://weaviate:8080
+    depends_on:
+      - weaviate
+    volumes:
+      - .:/app
+      - e2e-cargo-registry:/usr/local/cargo/registry
+      - e2e-cargo-target:/app/target
+
+  weft:
+    build:
+      context: .
+      dockerfile: docker/allinone.Dockerfile
+    environment:
+      WEAVIATE_URL: http://weaviate:8080
+    ports:
+      - "8280:8080"
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+
+volumes:
+  e2e-cargo-registry:
+  e2e-cargo-target:

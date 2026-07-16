@@ -23,12 +23,32 @@ export default function SchemaPage() {
         <span class="text-zinc-900 dark:text-zinc-100">{params.id}</span>
       </nav>
 
-      <h1 id="schema-heading" class="mt-2 text-2xl font-semibold tracking-tight">
-        Schema
-      </h1>
-      <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-        Collections on <code class="text-xs">{params.id}</code>.
-      </p>
+      <div class="mt-2 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 id="schema-heading" class="text-2xl font-semibold tracking-tight">
+            Schema
+          </h1>
+          <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            Collections on <code class="text-xs">{params.id}</code>. Click a collection for
+            details.
+          </p>
+        </div>
+        <div class="flex gap-2">
+          <a
+            href={api.exportUrl(params.id ?? "")}
+            download={`weft-schema-${params.id}.json`}
+            class="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium hover:border-weft-400 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-weft-500"
+          >
+            Export JSON
+          </a>
+          <A
+            href={`/i/${params.id}/diff`}
+            class="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium hover:border-weft-400 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-weft-500"
+          >
+            Compare…
+          </A>
+        </div>
+      </div>
 
       <div class="mt-6">
         <ErrorBoundary
@@ -42,7 +62,9 @@ export default function SchemaPage() {
             </div>
           )}
         >
-          <Show when={schema()}>{(s) => <SchemaTable classes={s().classes} />}</Show>
+          <Show when={schema()}>
+            {(s) => <SchemaTable classes={s().classes} instanceId={params.id ?? ""} />}
+          </Show>
         </ErrorBoundary>
       </div>
     </section>

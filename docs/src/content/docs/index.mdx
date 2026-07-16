@@ -1,0 +1,43 @@
+---
+title: Weft
+description: The missing UI for Weaviate — zero-config, self-hosted web interface for browsing and managing Weaviate instances.
+template: splash
+hero:
+  tagline: The missing UI for Weaviate. Browse schemas, explore data, and manage self-hosted instances — from one zero-config container.
+  actions:
+    - text: Get started
+      link: /weft/getting-started/
+      icon: right-arrow
+    - text: View on GitHub
+      link: https://github.com/compufreq/weft
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from "@astrojs/starlight/components";
+
+## Why Weft?
+
+If you self-host Weaviate, you get raw APIs and nothing else — the official console targets Weaviate Cloud, and the alternatives are IDE extensions or thin wrappers.
+
+<CardGrid stagger>
+  <Card title="Zero-config" icon="rocket">
+    One container next to your Weaviate. `docker run`, open your browser, done. No account, no
+    IDE, no YAML required.
+  </Card>
+  <Card title="Web-based" icon="laptop">
+    Usable by everyone on the team — data QA, ops, PMs — not just people with VS Code.
+  </Card>
+  <Card title="Weaviate-deep" icon="magnifier">
+    Multi-tenancy, hybrid search, schema diff, and node health as first-class features, not
+    afterthoughts.
+  </Card>
+  <Card title="Open source" icon="github">
+    AGPL-3.0 licensed, Rust + SolidStart, tested against real Weaviate in CI.
+  </Card>
+</CardGrid>
+
+:::note
+Weft is an independent open-source project and is **not affiliated with, endorsed by, or
+sponsored by Weaviate B.V.** "Weaviate" is a trademark of Weaviate B.V.
+:::

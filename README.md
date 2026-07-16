@@ -18,13 +18,18 @@ If you self-host Weaviate, you get raw APIs and nothing else — the official co
 docker run -d -p 8080:8080 -e WEAVIATE_URL=http://your-weaviate:8080 ghcr.io/compufreq/weft:latest
 ```
 
-Then open `http://localhost:8080`. *(Image published from v0.2.0 — until then, build from source below.)*
+Then open `http://localhost:8080`. One container serves the API and the UI — zero configuration.
 
-## Features (Phase 0 — walking skeleton)
+📖 **Docs: [compufreq.github.io/weft](https://compufreq.github.io/weft/)**
 
-- ✅ Connect to a self-hosted Weaviate instance
-- ✅ Browse collections/schema (server-side rendered)
-- 🔜 Schema export & diff · object explorer · BM25/vector/hybrid search · tenant management · ops dashboard — see [ROADMAP.md](ROADMAP.md)
+## Features (v0.2)
+
+- ✅ Zero-config all-in-one container
+- ✅ Multiple Weaviate instances — configured or added at runtime
+- ✅ Schema browser with per-collection detail views (properties, vectorizer, index config)
+- ✅ Schema export (JSON download) and structural **schema diff** (instance↔instance or instance↔file)
+- ✅ Server-side rendered — your data is in the HTML, no JS required
+- 🔜 Object explorer · BM25/vector/hybrid search · tenant management · ops dashboard — see [ROADMAP.md](ROADMAP.md)
 
 ## Architecture
 

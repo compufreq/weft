@@ -5,7 +5,7 @@
 
 use tracing_subscriber::EnvFilter;
 use weft_core::Config;
-use weft_server::{app, AppState};
+use weft_server::{app_with_proxy, supervisor, AppState, SsrProxy};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -15,9 +15,20 @@ async fn main() -> anyhow::Result<()> {
 
     let config = Config::load()?;
     let state = AppState::from_config(&config)?;
+
+    // All-in-one image: start + supervise the SolidStart SSR process and
+    // reverse-proxy every non-API path to it.
+    if let Ok(command) = std::env::var("WEFT_SSR_COMMAND") {
+        supervisor::spawn_supervised(command);
+    }
+    let ssr = std::env::var("WEFT_SSR_PROXY").ok().map(SsrProxy::new);
+    if let Some(proxy) = &ssr {
+        tracing::info!(?proxy, "SSR reverse proxy enabled");
+    }
+
     let listener = tokio::net::TcpListener::bind(&config.listen).await?;
     tracing::info!(listen = %config.listen, instances = state.instance_count(), "weft-server started");
 
-    axum::serve(listener, app(state)).await?;
+    axum::serve(listener, app_with_proxy(state, ssr)).await?;
     Ok(())
 }

@@ -1778,7 +1778,7 @@ dependencies = [
 
 [[package]]
 name = "weft-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "figment",
  "secrecy",
@@ -1790,12 +1790,15 @@ dependencies = [
 
 [[package]]
 name = "weft-server"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "axum",
  "dashmap",
+ "futures-util",
  "http-body-util",
+ "reqwest",
+ "secrecy",
  "serde",
  "serde_json",
  "thiserror",
@@ -1806,11 +1809,12 @@ dependencies = [
  "tracing-subscriber",
  "weft-core",
  "weft-weaviate",
+ "wiremock",
 ]
 
 [[package]]
 name = "weft-weaviate"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "reqwest",
  "secrecy",
@@ -1941,7 +1945,7 @@ checksum = "1ffae5123b2d3fc086436f8834ae3ab053a283cfac8fe0a0b8eaae044768a4c4"
 
 [[package]]
 name = "xtask"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "serde_json",

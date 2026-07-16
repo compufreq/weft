@@ -45,6 +45,28 @@ impl AppState {
         self.instances.get(id).map(|e| Arc::clone(e.value()))
     }
 
+    /// Register an instance at runtime. Returns `None` if the id is taken.
+    ///
+    /// Runtime instances live in memory only (the backend stays stateless);
+    /// they're gone after a restart. Persistent instances belong in
+    /// `weft.yaml` / `WEFT_INSTANCES`.
+    pub fn add_instance(&self, instance: Instance) -> Option<Arc<Instance>> {
+        use dashmap::mapref::entry::Entry;
+        match self.instances.entry(instance.id.clone()) {
+            Entry::Occupied(_) => None,
+            Entry::Vacant(v) => {
+                let arc = Arc::new(instance);
+                v.insert(Arc::clone(&arc));
+                Some(arc)
+            }
+        }
+    }
+
+    /// Remove an instance by id. Returns true if it existed.
+    pub fn remove_instance(&self, id: &str) -> bool {
+        self.instances.remove(id).is_some()
+    }
+
     /// All registered instances (stable order by id).
     pub fn instances(&self) -> Vec<Arc<Instance>> {
         let mut all: Vec<_> = self

@@ -11,10 +11,10 @@ Release management for Weft. Versioning follows [SemVer](https://semver.org); ev
 
 ## Phases
 
-### v0.1.0 — Walking skeleton *(in progress)*
+### v0.1.0 — Walking skeleton *(shipped 2026-07-16)*
 Monorepo, dockerized dev stack with seeded Weaviate, `weft-weaviate` client (meta + schema), axum API (`/healthz`, instances, schema), SSR schema browser page, CI + security pipelines, quickstart docs.
 
-### v0.2.0 — Schema & connections
+### v0.2.0 — Schema & connections *(in progress)*
 Multi-instance registry (config + runtime add), schema detail views (properties, vectorizer, index config), schema export + diff (instance↔instance, instance↔file), **all-in-one zero-config image on GHCR**, docs site on GitHub Pages.
 
 ### v0.3.0 — Data explorer
