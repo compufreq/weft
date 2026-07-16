@@ -149,6 +149,105 @@ async fn session_cookie_flow_works() {
     assert_eq!(auth["authorized"], true);
 }
 
+/// Like `send`, but stamps a `ConnectInfo` peer address so the session rate
+/// limiter sees distinct client IPs (in production axum injects this).
+async fn send_from(
+    app: &axum::Router,
+    ip: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value, axum::http::HeaderMap) {
+    use axum::extract::ConnectInfo;
+    use std::net::SocketAddr;
+    let addr: SocketAddr = format!("{ip}:52100").parse().unwrap();
+    let request = Request::builder()
+        .method("POST")
+        .uri("/api/v1/auth/session")
+        .header("content-type", "application/json")
+        .extension(ConnectInfo(addr))
+        .body(Body::from(body.to_string()))
+        .unwrap();
+    let response = app.clone().oneshot(request).await.unwrap();
+    let status = response.status();
+    let resp_headers = response.headers().clone();
+    let bytes = response.into_body().collect().await.unwrap().to_bytes();
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+        resp_headers,
+    )
+}
+
+#[tokio::test]
+async fn session_rate_limit_blocks_after_five_attempts_per_ip() {
+    let app = app_with(Some("s3cret"), false);
+    let wrong = serde_json::json!({ "token": "nope" });
+
+    // Five attempts pass through (and fail auth normally).
+    for i in 0..5 {
+        let (status, _, _) = send_from(&app, "10.9.9.1", wrong.clone()).await;
+        assert_eq!(
+            status,
+            StatusCode::UNAUTHORIZED,
+            "attempt {i} is a plain 401"
+        );
+    }
+
+    // Sixth is throttled — even with the RIGHT token (no oracle around the limit).
+    let (status, body, headers) =
+        send_from(&app, "10.9.9.1", serde_json::json!({ "token": "s3cret" })).await;
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(body["error"]["code"], "rate_limited");
+    let retry: u64 = headers
+        .get("retry-after")
+        .expect("Retry-After header present")
+        .to_str()
+        .unwrap()
+        .parse()
+        .unwrap();
+    assert!((1..=60).contains(&retry));
+    assert!(
+        headers.get("set-cookie").is_none(),
+        "no cookie while limited"
+    );
+
+    // A different client IP is unaffected.
+    let (status, _, headers) =
+        send_from(&app, "10.9.9.2", serde_json::json!({ "token": "s3cret" })).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    assert!(headers.get("set-cookie").is_some());
+}
+
+#[tokio::test]
+async fn logout_clears_the_session_cookie() {
+    let app = app_with(Some("s3cret"), false);
+
+    // Works with or without a valid session — logout must always be reachable.
+    let (status, _, headers) = send(
+        &app,
+        "DELETE",
+        "/api/v1/auth/session",
+        &[("cookie", "weft_token=s3cret")],
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let cookie = headers.get("set-cookie").unwrap().to_str().unwrap();
+    assert!(
+        cookie.starts_with("weft_token=;"),
+        "value cleared: {cookie}"
+    );
+    assert!(
+        cookie.contains("Max-Age=0"),
+        "expired immediately: {cookie}"
+    );
+    assert!(cookie.contains("HttpOnly"));
+
+    // Logout also passes the guard in read-only mode (it's an auth endpoint).
+    let ro = app_with(Some("s3cret"), true);
+    let (status, _, _) = send(&ro, "DELETE", "/api/v1/auth/session", &[], None).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+}
+
 #[tokio::test]
 async fn read_only_blocks_mutations_but_not_reads() {
     let app = app_with(None, true);

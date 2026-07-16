@@ -1,5 +1,6 @@
 //! Application state: the registry of configured Weaviate instances.
 
+use crate::api::auth::SessionRateLimiter;
 use dashmap::DashMap;
 use secrecy::SecretString;
 use std::sync::Arc;
@@ -24,6 +25,8 @@ pub struct AppState {
     pub auth_token: Option<SecretString>,
     /// When true, mutating API requests are rejected.
     pub read_only: bool,
+    /// Per-IP rate limiter for `POST /api/v1/auth/session`.
+    pub session_limiter: Arc<SessionRateLimiter>,
 }
 
 impl AppState {

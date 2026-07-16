@@ -1,4 +1,5 @@
 import { A } from "@solidjs/router";
+import LogoutButton from "./LogoutButton";
 
 export default function Nav() {
   return (
@@ -14,6 +15,9 @@ export default function Nav() {
           Weft
         </A>
         <span class="text-xs text-zinc-500 dark:text-zinc-400">the missing UI for Weaviate</span>
+        <span class="ml-auto">
+          <LogoutButton />
+        </span>
       </nav>
     </header>
   );

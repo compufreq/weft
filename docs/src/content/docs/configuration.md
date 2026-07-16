@@ -51,9 +51,17 @@ docker run -d -p 8080:8080 \
   ghcr.io/compufreq/weft:latest
 ```
 
-- **Browsers** get a token prompt on first visit; the token is exchanged for an HttpOnly, SameSite=Strict session cookie (7 days).
+- **Browsers** get a token prompt on first visit; the token is exchanged for an HttpOnly, SameSite=Strict session cookie (7 days). A **Log out** button appears in the nav while a session is active (v0.7+).
 - **API clients** send `Authorization: Bearer <token>`.
 - `/healthz` and `/readyz` stay open for orchestrators.
+
+### Brute-force protection (v0.7+)
+
+`POST /api/v1/auth/session` is rate-limited to **5 attempts per minute per client IP**. Over the limit, the endpoint answers `429` with a `Retry-After` header and `{"error":{"code":"rate_limited"}}`; the UI shows a friendly countdown. The limit keys on the TCP peer address — `X-Forwarded-For` is deliberately ignored (it's spoofable), so behind a reverse proxy the limit applies per proxy hop. Combine with a strong random token (`openssl rand -hex 24`); at 5 attempts/minute a 24-byte token is not brute-forceable.
+
+### Logging out
+
+`DELETE /api/v1/auth/session` clears the session cookie (the nav button calls this). The endpoint is unauthenticated by design — an expired or garbage cookie must still be clearable — and idempotent.
 
 ## Read-only mode
 

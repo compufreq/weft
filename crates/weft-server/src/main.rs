@@ -29,6 +29,11 @@ async fn main() -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(&config.listen).await?;
     tracing::info!(listen = %config.listen, instances = state.instance_count(), "weft-server started");
 
-    axum::serve(listener, app_with_proxy(state, ssr)).await?;
+    // ConnectInfo gives handlers the TCP peer address (session rate limiting).
+    axum::serve(
+        listener,
+        app_with_proxy(state, ssr).into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .await?;
     Ok(())
 }

@@ -29,7 +29,10 @@ pub fn app_with_proxy(state: AppState, ssr: Option<SsrProxy>) -> Router {
         .route("/healthz", get(api::health::healthz))
         .route("/readyz", get(api::health::readyz))
         .route("/api/v1/auth", get(api::auth::status))
-        .route("/api/v1/auth/session", post(api::auth::session))
+        .route(
+            "/api/v1/auth/session",
+            post(api::auth::session).delete(api::auth::logout),
+        )
         .route(
             "/api/v1/instances",
             get(api::instances::list).post(api::instances::add),

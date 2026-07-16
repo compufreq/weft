@@ -29,8 +29,11 @@ Node/shard health (live polling), index & queue status, backup create/restore (m
 ### v0.6.0 — Hardening *(shipped 2026-07-16)*
 Optional API auth (`WEFT_AUTH_TOKEN`), read-only mode, Weaviate version test matrix (1.30 + latest) with graceful degradation, 100k-object performance validation.
 
-### v0.7 – v0.9 — Pre-1.0 polish
-Optional UI auth token, read-only mode, Weaviate version test matrix, 1M-object performance pass, optional gRPC data path, arm64 polish.
+### v0.7.0 — Auth hardening *(shipped 2026-07-16)*
+Session rate limiting (5 attempts/min/IP on `POST /api/v1/auth/session`, 429 + `Retry-After`), logout endpoint (`DELETE /api/v1/auth/session`) with a nav **Log out** button when auth is active.
+
+### v0.8 – v0.9 — Pre-1.0 polish
+arm64 image, docs review + upgrade guide, security review pass (threat model), 1M-object performance pass, optional gRPC data path.
 
 ### v1.0.0 — Stable
 `/api/v1` stability promise, complete documentation & walkthroughs, upgrade guide, security review.

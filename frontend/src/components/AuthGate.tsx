@@ -1,9 +1,22 @@
-import { createSignal, onMount, Show, type JSX } from "solid-js";
+import { createContext, createSignal, onMount, Show, useContext, type JSX } from "solid-js";
 
-interface AuthStatus {
+export interface AuthStatus {
   auth_required: boolean;
   authorized: boolean;
   read_only: boolean;
+}
+
+export interface AuthContextValue {
+  /** Current auth status (null until the first /api/v1/auth response). */
+  status: () => AuthStatus | null;
+  /** Clear the session cookie and reload into the token gate. */
+  logout: () => Promise<void>;
+}
+
+export const AuthContext = createContext<AuthContextValue>();
+
+export function useAuth(): AuthContextValue | undefined {
+  return useContext(AuthContext);
 }
 
 /**
@@ -39,6 +52,11 @@ export default function AuthGate(props: { children: JSX.Element }) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ token: token() }),
       });
+      if (res.status === 429) {
+        const retryAfter = res.headers.get("retry-after");
+        setError(`Too many attempts — try again in ${retryAfter ?? "60"}s.`);
+        return;
+      }
       if (!res.ok) {
         setError("Invalid token.");
         return;
@@ -52,13 +70,22 @@ export default function AuthGate(props: { children: JSX.Element }) {
     }
   };
 
+  const logout = async () => {
+    try {
+      await fetch("/api/v1/auth/session", { method: "DELETE" });
+    } catch {
+      // Backend unreachable — reload anyway; the gate re-checks status.
+    }
+    location.reload();
+  };
+
   const needsToken = () => {
     const s = status();
     return s !== null && s.auth_required && !s.authorized;
   };
 
   return (
-    <>
+    <AuthContext.Provider value={{ status, logout }}>
       <Show when={status()?.read_only}>
         <div
           role="status"
@@ -71,12 +98,12 @@ export default function AuthGate(props: { children: JSX.Element }) {
       <Show when={!needsToken()} fallback={<TokenPrompt />}>
         {props.children}
       </Show>
-    </>
+    </AuthContext.Provider>
   );
 
   function TokenPrompt() {
     return (
-      <div class="flex min-h-[60vh] items-center justify-center px-4">
+      <main class="flex min-h-[60vh] items-center justify-center px-4">
         <form
           onSubmit={submit}
           aria-label="Authentication required"
@@ -111,7 +138,7 @@ export default function AuthGate(props: { children: JSX.Element }) {
             {busy() ? "Checking…" : "Unlock"}
           </button>
         </form>
-      </div>
+      </main>
     );
   }
 }
