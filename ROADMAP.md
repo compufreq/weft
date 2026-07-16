@@ -17,7 +17,7 @@ Monorepo, dockerized dev stack with seeded Weaviate, `weft-weaviate` client (met
 ### v0.2.0 — Schema & connections *(shipped 2026-07-16)*
 Multi-instance registry (config + runtime add), schema detail views (properties, vectorizer, index config), schema export + diff (instance↔instance, instance↔file), **all-in-one zero-config image on GHCR**, docs site on GitHub Pages.
 
-### v0.3.0 — Data explorer
+### v0.3.0 — Data explorer *(shipped 2026-07-16)*
 Cursor-paginated object browser (virtualized), JSON detail drawer, BM25 / nearVector / nearText / hybrid search with scores, NDJSON streaming export.
 
 ### v0.4.0 — Multi-tenancy
