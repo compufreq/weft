@@ -5,6 +5,7 @@ TASKS.md
 BUGS.md
 TESTS.md
 HANDOVER.md
+*.local.md
 
 # --- Rust ---
 target/
