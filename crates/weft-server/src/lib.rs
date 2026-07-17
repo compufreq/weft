@@ -112,6 +112,30 @@ pub fn app_with_proxy(state: AppState, ssr: Option<SsrProxy>) -> Router {
         .route("/api/v1/instances/{id}/metrics", get(api::ops::metrics))
         .route("/api/v1/instances/{id}/rbac", get(api::rbac::overview))
         .route(
+            "/api/v1/instances/{id}/rbac/roles",
+            post(api::rbac::create_role),
+        )
+        .route(
+            "/api/v1/instances/{id}/rbac/roles/{role}",
+            delete(api::rbac::delete_role),
+        )
+        .route(
+            "/api/v1/instances/{id}/rbac/roles/{role}/add-permissions",
+            post(api::rbac::add_permissions),
+        )
+        .route(
+            "/api/v1/instances/{id}/rbac/roles/{role}/remove-permissions",
+            post(api::rbac::remove_permissions),
+        )
+        .route(
+            "/api/v1/instances/{id}/rbac/users/{user_id}/assign",
+            post(api::rbac::assign_roles),
+        )
+        .route(
+            "/api/v1/instances/{id}/rbac/users/{user_id}/revoke",
+            post(api::rbac::revoke_roles),
+        )
+        .route(
             "/api/v1/instances/{id}/capabilities",
             get(api::ops::capabilities),
         )

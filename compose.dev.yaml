@@ -23,6 +23,24 @@ services:
     volumes:
       - weaviate-data:/var/lib/weaviate
 
+  # RBAC-enabled Weaviate for role/user-management tests (API-key auth,
+  # ephemeral — no volume; restarting it resets all roles/users).
+  weaviate-rbac:
+    image: cr.weaviate.io/semitechnologies/weaviate:1.37.2
+    command: ["--host", "0.0.0.0", "--port", "8080", "--scheme", "http"]
+    environment:
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "false"
+      AUTHENTICATION_APIKEY_ENABLED: "true"
+      AUTHENTICATION_APIKEY_ALLOWED_KEYS: "rbac-admin-key"
+      AUTHENTICATION_APIKEY_USERS: "rbac-admin"
+      AUTHENTICATION_DB_USERS_ENABLED: "true"
+      AUTHORIZATION_RBAC_ENABLED: "true"
+      AUTHORIZATION_RBAC_ROOT_USERS: "rbac-admin"
+      PERSISTENCE_DATA_PATH: /var/lib/weaviate
+      CLUSTER_HOSTNAME: rbacnode
+    ports:
+      - "8183:8080"
+
   # One-shot: seeds demo collections (Article + multi-tenant Product).
   # Waits for Weaviate readiness itself (xtask polls /.well-known/ready).
   seed:
@@ -47,6 +65,8 @@ services:
     command: ["cargo", "watch", "-x", "run -p weft-server"]
     environment:
       WEAVIATE_URL: http://weaviate:8080
+      WEAVIATE_RBAC_URL: http://weaviate-rbac:8080
+      WEAVIATE_RBAC_KEY: rbac-admin-key
       RUST_LOG: info,weft_server=debug
       CARGO_TERM_COLOR: always
     ports:
@@ -54,6 +74,8 @@ services:
     depends_on:
       seed:
         condition: service_completed_successfully
+      weaviate-rbac:
+        condition: service_started
     volumes:
       - .:/app
       - cargo-registry:/usr/local/cargo/registry

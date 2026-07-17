@@ -65,6 +65,21 @@ jobs:
             -e PROMETHEUS_MONITORING_ENABLED=true \
             cr.weaviate.io/semitechnologies/weaviate:${{ matrix.weaviate }} \
             --host 0.0.0.0 --port 8080 --scheme http
+      - name: Start RBAC-enabled Weaviate (latest leg only)
+        if: matrix.weaviate == '1.37.2'
+        run: |
+          docker run -d --name weaviate-rbac -p 8082:8080 \
+            -e AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=false \
+            -e AUTHENTICATION_APIKEY_ENABLED=true \
+            -e AUTHENTICATION_APIKEY_ALLOWED_KEYS=rbac-admin-key \
+            -e AUTHENTICATION_APIKEY_USERS=rbac-admin \
+            -e AUTHENTICATION_DB_USERS_ENABLED=true \
+            -e AUTHORIZATION_RBAC_ENABLED=true \
+            -e AUTHORIZATION_RBAC_ROOT_USERS=rbac-admin \
+            -e PERSISTENCE_DATA_PATH=/var/lib/weaviate \
+            -e CLUSTER_HOSTNAME=rbacnode \
+            cr.weaviate.io/semitechnologies/weaviate:${{ matrix.weaviate }} \
+            --host 0.0.0.0 --port 8080 --scheme http
       - name: Seed demo data
         run: cargo run -p xtask -- seed
         env:
@@ -73,6 +88,9 @@ jobs:
         run: cargo nextest run --workspace --test '*'
         env:
           WEAVIATE_URL: http://localhost:8081
+          # Empty on the floor leg — the RBAC-management tests skip themselves.
+          WEAVIATE_RBAC_URL: ${{ matrix.weaviate == '1.37.2' && 'http://localhost:8082' || '' }}
+          WEAVIATE_RBAC_KEY: rbac-admin-key
       - name: Weaviate logs (on failure)
         if: failure()
         run: docker logs weaviate

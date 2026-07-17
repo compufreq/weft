@@ -248,6 +248,8 @@ export interface RbacRole {
 export interface RbacUser {
   user_id: string;
   active?: boolean;
+  /** "db_user" (dynamic) or "db_env_user" (env API key). */
+  user_type?: string | null;
   roles: string[];
 }
 
@@ -443,6 +445,36 @@ export const api = {
     ),
   rbac: (instanceId: string) =>
     fetchJson<RbacOverview>(`/api/v1/instances/${encodeURIComponent(instanceId)}/rbac`),
+  createRole: (instanceId: string, name: string, permissions: unknown[]) =>
+    postJson<unknown>(`/api/v1/instances/${encodeURIComponent(instanceId)}/rbac/roles`, {
+      name,
+      permissions,
+    }),
+  deleteRole: (instanceId: string, role: string) =>
+    fetchJson<void>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/rbac/roles/${encodeURIComponent(role)}`,
+      { method: "DELETE" },
+    ),
+  addRolePermissions: (instanceId: string, role: string, permissions: unknown[]) =>
+    postJson<void>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/rbac/roles/${encodeURIComponent(role)}/add-permissions`,
+      { permissions },
+    ),
+  removeRolePermissions: (instanceId: string, role: string, permissions: unknown[]) =>
+    postJson<void>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/rbac/roles/${encodeURIComponent(role)}/remove-permissions`,
+      { permissions },
+    ),
+  assignUserRoles: (instanceId: string, userId: string, roles: string[], userType?: string) =>
+    postJson<void>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/rbac/users/${encodeURIComponent(userId)}/assign`,
+      { roles, user_type: userType },
+    ),
+  revokeUserRoles: (instanceId: string, userId: string, roles: string[], userType?: string) =>
+    postJson<void>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/rbac/users/${encodeURIComponent(userId)}/revoke`,
+      { roles, user_type: userType },
+    ),
   statistics: (instanceId: string) =>
     fetchJson<ClusterStatistics>(
       `/api/v1/instances/${encodeURIComponent(instanceId)}/statistics`,

@@ -42,7 +42,7 @@ Browser ──(1)── Weft container ──(2)── Weaviate instance(s)
 
 ## Mutation surface (inventory)
 
-Everything below is blocked in read-only mode and hidden in the read-only UI: instance add/remove · tenant create/HOT-COLD · backup create/restore · object create/replace/delete · batch import · collection create/delete · add property · alias create/repoint/delete.
+Everything below is blocked in read-only mode and hidden in the read-only UI: instance add/remove · tenant create/HOT-COLD · backup create/restore · object create/replace/delete · batch import · collection create/delete · add property · alias create/repoint/delete · RBAC role create/delete, permission add/remove, user role assign/revoke (v1.3+; role names and user ids are validated before URL-path interpolation).
 
 ## Accepted risks (operator responsibilities)
 

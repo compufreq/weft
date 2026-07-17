@@ -73,6 +73,16 @@ docker run -d -p 8080:8080 \
 Persisted instances include their API keys in plain text (they must survive the restart) — the file deserves the same protection as `weft.yaml`. A corrupt file never stops the server; it just boots without runtime instances.
 :::
 
+## RBAC management (v1.3+)
+
+When an instance runs with `AUTHORIZATION_RBAC_ENABLED=true` **and** Weft's
+API key has authz permissions (e.g. a root user), the ops page's access-control
+panel becomes editable: create and delete roles, add/remove permissions on a
+role (guided per-action builder with a collection filter), and assign or
+revoke roles on users. Everything stays read-only when RBAC is off, when the
+key lacks permission, or in [read-only mode](#read-only-mode) — and every
+mutation is server-enforced, not just hidden in the UI.
+
 ## Authentication (v0.6+)
 
 Set `WEFT_AUTH_TOKEN` to protect the API:

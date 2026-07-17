@@ -79,6 +79,8 @@ pub async fn overview(
             users.push(json!({
                 "user_id": user_id,
                 "active": user["active"],
+                // "db_user" (dynamic) or "db_env_user" (env API key).
+                "user_type": user["dbUserType"],
                 "roles": assigned,
             }));
         }
@@ -90,4 +92,198 @@ pub async fn overview(
         "users": users,
         "users_truncated": users_truncated,
     })))
+}
+
+// ---------- RBAC management (v1.3) ----------
+//
+// All handlers below are mutations: POSTs are blocked by the read-only
+// guard's default rule, the DELETE by method. Role names are validated
+// before they land in a URL path.
+
+use serde::Deserialize;
+
+/// Validate a role name for safe URL-path interpolation.
+fn valid_role_name(name: &str) -> Result<(), ApiError> {
+    let ok = !name.is_empty()
+        && name.len() <= 128
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.');
+    if ok {
+        Ok(())
+    } else {
+        Err(ApiError::InvalidInput(format!(
+            "`{name}` is not a valid role name (alphanumeric, `_`, `-`, `.`)"
+        )))
+    }
+}
+
+/// Validate a user id for safe URL-path interpolation.
+fn valid_user_id(id: &str) -> Result<(), ApiError> {
+    let ok = !id.is_empty()
+        && id.len() <= 128
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.' || c == '@');
+    if ok {
+        Ok(())
+    } else {
+        Err(ApiError::InvalidInput(format!(
+            "`{id}` is not a valid user id"
+        )))
+    }
+}
+
+fn permissions_array(permissions: &Value) -> Result<(), ApiError> {
+    if permissions.is_array() {
+        Ok(())
+    } else {
+        Err(ApiError::InvalidInput(
+            "`permissions` must be an array of permission objects".into(),
+        ))
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateRole {
+    pub name: String,
+    /// Weaviate permission objects, passed through verbatim
+    /// (e.g. `{ "action": "read_data", "data": { "collection": "*" } }`).
+    #[serde(default)]
+    pub permissions: Value,
+}
+
+/// `POST /api/v1/instances/{id}/rbac/roles` — create a role.
+pub async fn create_role(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<CreateRole>,
+) -> Result<(axum::http::StatusCode, Json<Value>), ApiError> {
+    let instance = state
+        .instance(&id)
+        .ok_or_else(|| ApiError::InstanceNotFound(id))?;
+    valid_role_name(&body.name)?;
+    let permissions = if body.permissions.is_null() {
+        json!([])
+    } else {
+        body.permissions
+    };
+    permissions_array(&permissions)?;
+    instance
+        .client
+        .create_role(&body.name, &permissions)
+        .await?;
+    Ok((
+        axum::http::StatusCode::CREATED,
+        Json(json!({ "name": body.name })),
+    ))
+}
+
+/// `DELETE /api/v1/instances/{id}/rbac/roles/{role}` — delete a role.
+pub async fn delete_role(
+    State(state): State<AppState>,
+    Path((id, role)): Path<(String, String)>,
+) -> Result<axum::http::StatusCode, ApiError> {
+    let instance = state
+        .instance(&id)
+        .ok_or_else(|| ApiError::InstanceNotFound(id))?;
+    valid_role_name(&role)?;
+    instance.client.delete_role(&role).await?;
+    Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Permissions {
+    pub permissions: Value,
+}
+
+/// `POST /api/v1/instances/{id}/rbac/roles/{role}/add-permissions`
+pub async fn add_permissions(
+    State(state): State<AppState>,
+    Path((id, role)): Path<(String, String)>,
+    Json(body): Json<Permissions>,
+) -> Result<axum::http::StatusCode, ApiError> {
+    let instance = state
+        .instance(&id)
+        .ok_or_else(|| ApiError::InstanceNotFound(id))?;
+    valid_role_name(&role)?;
+    permissions_array(&body.permissions)?;
+    instance
+        .client
+        .add_role_permissions(&role, &body.permissions)
+        .await?;
+    Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+/// `POST /api/v1/instances/{id}/rbac/roles/{role}/remove-permissions`
+pub async fn remove_permissions(
+    State(state): State<AppState>,
+    Path((id, role)): Path<(String, String)>,
+    Json(body): Json<Permissions>,
+) -> Result<axum::http::StatusCode, ApiError> {
+    let instance = state
+        .instance(&id)
+        .ok_or_else(|| ApiError::InstanceNotFound(id))?;
+    valid_role_name(&role)?;
+    permissions_array(&body.permissions)?;
+    instance
+        .client
+        .remove_role_permissions(&role, &body.permissions)
+        .await?;
+    Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UserRoles {
+    pub roles: Vec<String>,
+    /// Weaviate user type (`db` for dynamic users, `db_env_user` for
+    /// env-configured API-key users). Passed through when set.
+    #[serde(default)]
+    pub user_type: Option<String>,
+}
+
+/// `POST /api/v1/instances/{id}/rbac/users/{user_id}/assign`
+pub async fn assign_roles(
+    State(state): State<AppState>,
+    Path((id, user_id)): Path<(String, String)>,
+    Json(body): Json<UserRoles>,
+) -> Result<axum::http::StatusCode, ApiError> {
+    let instance = state
+        .instance(&id)
+        .ok_or_else(|| ApiError::InstanceNotFound(id))?;
+    valid_user_id(&user_id)?;
+    for role in &body.roles {
+        valid_role_name(role)?;
+    }
+    if body.roles.is_empty() {
+        return Err(ApiError::InvalidInput("`roles` must not be empty".into()));
+    }
+    instance
+        .client
+        .assign_user_roles(&user_id, &body.roles, body.user_type.as_deref())
+        .await?;
+    Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+/// `POST /api/v1/instances/{id}/rbac/users/{user_id}/revoke`
+pub async fn revoke_roles(
+    State(state): State<AppState>,
+    Path((id, user_id)): Path<(String, String)>,
+    Json(body): Json<UserRoles>,
+) -> Result<axum::http::StatusCode, ApiError> {
+    let instance = state
+        .instance(&id)
+        .ok_or_else(|| ApiError::InstanceNotFound(id))?;
+    valid_user_id(&user_id)?;
+    for role in &body.roles {
+        valid_role_name(role)?;
+    }
+    if body.roles.is_empty() {
+        return Err(ApiError::InvalidInput("`roles` must not be empty".into()));
+    }
+    instance
+        .client
+        .revoke_user_roles(&user_id, &body.roles, body.user_type.as_deref())
+        .await?;
+    Ok(axum::http::StatusCode::NO_CONTENT)
 }

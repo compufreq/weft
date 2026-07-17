@@ -1,4 +1,5 @@
 import { A, useParams } from "@solidjs/router";
+import { useAuth } from "~/components/AuthGate";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import BackupsTable from "~/components/ops/BackupsTable";
 import MetricsPanel, {
@@ -22,6 +23,8 @@ const POLL_MS = 10_000;
 export default function OpsPage() {
   const params = useParams();
   const instanceId = () => params.id ?? "";
+  const auth = useAuth();
+  const readOnly = () => auth?.status()?.read_only ?? false;
 
   const [nodes, setNodes] = createSignal<ClusterNode[]>([]);
   const [caps, setCaps] = createSignal<Capabilities | null>(null);
@@ -57,6 +60,14 @@ export default function OpsPage() {
   const [rbac, setRbac] = createSignal<RbacOverview | null>(null);
   const [stats, setStats] = createSignal<ClusterStatistics | null>(null);
 
+  const refreshRbac = async () => {
+    try {
+      setRbac(await api.rbac(instanceId()));
+    } catch {
+      setRbac(null);
+    }
+  };
+
   // Live metrics: rolling in-browser window, polled with the page.
   const [metricsWindow, setMetricsWindow] = createSignal<MetricsSample[]>([]);
   const refreshMetrics = async () => {
@@ -82,11 +93,7 @@ export default function OpsPage() {
         setError(err instanceof Error ? err.message : String(err));
       }
       // Auxiliary panels — failures here never block the ops page.
-      try {
-        setRbac(await api.rbac(instanceId()));
-      } catch {
-        setRbac(null);
-      }
+      await refreshRbac();
       try {
         setStats(await api.statistics(instanceId()));
       } catch {
@@ -260,7 +267,30 @@ export default function OpsPage() {
 
       <div class="mt-6 grid gap-6 lg:grid-cols-2">
         <Show when={stats()}>{(s) => <StatsCard stats={s()} />}</Show>
-        <Show when={rbac()}>{(r) => <RbacPanel data={r()} />}</Show>
+        <Show when={rbac()}>
+          {(r) => (
+            <RbacPanel
+              data={r()}
+              readOnly={readOnly()}
+              onCreateRole={(name, permissions) =>
+                api.createRole(instanceId(), name, permissions).then(refreshRbac)
+              }
+              onDeleteRole={(role) => api.deleteRole(instanceId(), role).then(refreshRbac)}
+              onAddPermission={(role, permission) =>
+                api.addRolePermissions(instanceId(), role, [permission]).then(refreshRbac)
+              }
+              onRemovePermission={(role, permission) =>
+                api.removeRolePermissions(instanceId(), role, [permission]).then(refreshRbac)
+              }
+              onAssign={(userId, role, userType) =>
+                api.assignUserRoles(instanceId(), userId, [role], userType).then(refreshRbac)
+              }
+              onRevoke={(userId, role, userType) =>
+                api.revokeUserRoles(instanceId(), userId, [role], userType).then(refreshRbac)
+              }
+            />
+          )}
+        </Show>
       </div>
     </section>
   );

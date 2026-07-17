@@ -381,6 +381,120 @@ impl WeaviateClient {
         Self::decode(resp).await
     }
 
+    /// Check a response for success, discarding any body (several authz
+    /// endpoints answer 2xx with an empty body).
+    async fn expect_success(resp: reqwest::Response) -> Result<(), Error> {
+        let status = resp.status();
+        if status.is_success() {
+            Ok(())
+        } else {
+            Err(Error::Status {
+                status,
+                body: resp.text().await.unwrap_or_default(),
+            })
+        }
+    }
+
+    /// `POST /v1/authz/roles` — create a role with initial permissions.
+    pub async fn create_role(&self, name: &str, permissions: &Value) -> Result<(), Error> {
+        let resp = self
+            .post(self.url("/v1/authz/roles")?)
+            .json(&serde_json::json!({ "name": name, "permissions": permissions }))
+            .send()
+            .await?;
+        Self::expect_success(resp).await
+    }
+
+    /// `DELETE /v1/authz/roles/{name}` — delete a role (assignments go too).
+    pub async fn delete_role(&self, name: &str) -> Result<(), Error> {
+        let resp = self
+            .delete(self.url(&format!("/v1/authz/roles/{name}"))?)
+            .send()
+            .await?;
+        Self::expect_success(resp).await
+    }
+
+    /// `POST /v1/authz/roles/{name}/add-permissions`
+    pub async fn add_role_permissions(&self, name: &str, permissions: &Value) -> Result<(), Error> {
+        let resp = self
+            .post(self.url(&format!("/v1/authz/roles/{name}/add-permissions"))?)
+            .json(&serde_json::json!({ "permissions": permissions }))
+            .send()
+            .await?;
+        Self::expect_success(resp).await
+    }
+
+    /// `POST /v1/authz/roles/{name}/remove-permissions`
+    pub async fn remove_role_permissions(
+        &self,
+        name: &str,
+        permissions: &Value,
+    ) -> Result<(), Error> {
+        let resp = self
+            .post(self.url(&format!("/v1/authz/roles/{name}/remove-permissions"))?)
+            .json(&serde_json::json!({ "permissions": permissions }))
+            .send()
+            .await?;
+        Self::expect_success(resp).await
+    }
+
+    /// `POST /v1/authz/users/{id}/assign` — grant roles to a user.
+    pub async fn assign_user_roles(
+        &self,
+        user_id: &str,
+        roles: &[String],
+        user_type: Option<&str>,
+    ) -> Result<(), Error> {
+        let mut body = serde_json::json!({ "roles": roles });
+        if let Some(t) = user_type {
+            body["userType"] = serde_json::json!(t);
+        }
+        let resp = self
+            .post(self.url(&format!("/v1/authz/users/{user_id}/assign"))?)
+            .json(&body)
+            .send()
+            .await?;
+        Self::expect_success(resp).await
+    }
+
+    /// `POST /v1/authz/users/{id}/revoke` — revoke roles from a user.
+    pub async fn revoke_user_roles(
+        &self,
+        user_id: &str,
+        roles: &[String],
+        user_type: Option<&str>,
+    ) -> Result<(), Error> {
+        let mut body = serde_json::json!({ "roles": roles });
+        if let Some(t) = user_type {
+            body["userType"] = serde_json::json!(t);
+        }
+        let resp = self
+            .post(self.url(&format!("/v1/authz/users/{user_id}/revoke"))?)
+            .json(&body)
+            .send()
+            .await?;
+        Self::expect_success(resp).await
+    }
+
+    /// `POST /v1/users/db/{id}` — create a dynamic database user
+    /// (Weaviate ≥ 1.30 with RBAC). Returns `{ "apikey": "..." }`.
+    pub async fn create_db_user(&self, user_id: &str) -> Result<Value, Error> {
+        let resp = self
+            .post(self.url(&format!("/v1/users/db/{user_id}"))?)
+            .send()
+            .await?;
+        Self::decode(resp).await
+    }
+
+    /// `DELETE /v1/users/db/{id}` — delete a dynamic database user.
+    pub async fn delete_db_user(&self, user_id: &str) -> Result<(), Error> {
+        let resp = self
+            .delete(self.url(&format!("/v1/users/db/{user_id}"))?)
+            .send()
+            .await?;
+        Self::expect_success(resp).await
+    }
+
     /// `GET /v1/cluster/statistics` — Raft cluster statistics.
     pub async fn cluster_statistics(&self) -> Result<Value, Error> {
         let resp = self.get(self.url("/v1/cluster/statistics")?).send().await?;

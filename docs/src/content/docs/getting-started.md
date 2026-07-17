@@ -56,7 +56,7 @@ The image is published for **amd64 and arm64** (Apple Silicon, Raspberry Pi 5, G
 - **Search** — BM25, nearVector, nearText, and hybrid, with scores
 - **Query console** — raw GraphQL scratchpad per instance (query-only, safe in read-only mode)
 - **Manage tenants** — HOT/COLD activation, per-tenant object counts, tenant-scoped browsing
-- **Watch your cluster** — node & shard health, Raft statistics, capabilities, backup create/restore, read-only RBAC visibility (roles, users, assignments), live Prometheus metrics charts (heap, CPU, requests/s, object counts)
+- **Watch your cluster** — node & shard health, Raft statistics, capabilities, backup create/restore, **RBAC management** (create/delete roles, edit permissions, assign/revoke user roles — on RBAC-enabled instances), live Prometheus metrics charts (heap, CPU, requests/s, object counts)
 - **See your vectors** — 2D PCA map of a collection's embedding space, colored by facet
 - **Lock it down** — optional access token ([`WEFT_AUTH_TOKEN`](/weft/configuration/#authentication-v06)) and [read-only mode](/weft/configuration/#read-only-mode)
 - **Pick your look** — dark/light theme toggle in the nav (follows your OS by default)
