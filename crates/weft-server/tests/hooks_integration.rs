@@ -167,5 +167,8 @@ async fn hook_actor_comes_from_the_auth_backend() {
 
     let events = recorded.lock().unwrap();
     assert_eq!(events.len(), 2, "{events:?}");
-    assert!(events.iter().all(|e| e.actor == "shared-token"), "{events:?}");
+    assert!(
+        events.iter().all(|e| e.actor == "shared-token"),
+        "{events:?}"
+    );
 }

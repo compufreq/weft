@@ -73,7 +73,7 @@
   <h1>Weft User Manual</h1>
   <div class="subtitle">The missing UI for Weaviate &mdash; zero-config, self-hosted, open source</div>
   <div class="meta">
-    Version 1.3.1 &middot; July 2026<br>
+    Version 1.4.0 &middot; July 2026<br>
     github.com/compufreq/weft &middot; compufreq.github.io/weft<br><br>
     Weft is an independent open-source project, not affiliated with Weaviate B.V.
   </div>
@@ -114,7 +114,7 @@
     <li>Start the container, pointing it at your Weaviate:
 <pre><code>docker run -d -p 8080:8080 \
   -e WEAVIATE_URL=http://your-weaviate:8080 \
-  ghcr.io/compufreq/weft:1.3</code></pre></li>
+  ghcr.io/compufreq/weft:1.4</code></pre></li>
     <li>Open <code>http://localhost:8080</code> in your browser.</li>
     <li>Your Weaviate appears on the <b>Instances</b> page, ready to browse. That is the whole setup.</li>
   </ol>
@@ -126,7 +126,7 @@
     image: cr.weaviate.io/semitechnologies/weaviate:1.37.2
     # ... your existing Weaviate config ...
   weft:
-    image: ghcr.io/compufreq/weft:1.3
+    image: ghcr.io/compufreq/weft:1.4
     environment:
       WEAVIATE_URL: http://weaviate:8080
     ports:
@@ -160,7 +160,7 @@
 <pre><code>docker run -d -p 8080:8080 \
   -e WEAVIATE_URL=http://weaviate:8080 \
   -e WEFT_AUTH_TOKEN=$(openssl rand -hex 24) \
-  ghcr.io/compufreq/weft:1.3</code></pre></li>
+  ghcr.io/compufreq/weft:1.4</code></pre></li>
     <li>Visiting Weft now shows the token prompt. Enter the token and click <b>Unlock</b>.</li>
     <li>Your browser receives a secure session cookie valid for 7 days. A <b>Log out</b> button appears in the navigation bar; clicking it ends the session immediately.</li>
   </ol>
@@ -434,7 +434,7 @@ instances:
     api_key: "sk-..."</code></pre>
   <div class="warn">API keys in <code>weft.yaml</code> and in the instances file are stored in plain text &mdash; protect those volumes. Keys are never shown in the UI or API responses.</div>
   <h3>Upgrades</h3>
-  <p>Weft is stateless: upgrading is <code>docker pull</code> + recreate. Your Weaviate data is never touched. The <code>/api/v1</code> HTTP API is stable across all 1.x releases (additive changes only). Pin at least the minor tag (<code>ghcr.io/compufreq/weft:1.3</code>) in production.</p>
+  <p>Weft is stateless: upgrading is <code>docker pull</code> + recreate. Your Weaviate data is never touched. The <code>/api/v1</code> HTTP API is stable across all 1.x releases (additive changes only). Pin at least the minor tag (<code>ghcr.io/compufreq/weft:1.4</code>) in production.</p>
 </div>
 
 <div class="chapter">

@@ -56,5 +56,8 @@ CSV import (client-side RFC-4180 parsing, schema-typed columns, `id`/`vector` sp
 ### v1.2.0 — Performance & live metrics *(shipped 2026-07-17)*
 1M-object performance pass (browse/search single-digit-to-low-tens ms through the released image; numbers in the release notes), live Prometheus metrics on the ops page (heap, goroutines, CPU, requests/s, object counts, vector-index size — rolling in-browser window, no storage; per-instance `metrics_url`, graceful degrade). gRPC evaluated against the 1M profile and **deferred**: every Weft-path operation measured ≤30ms; the slow paths are Weaviate-side query work a transport change would not affect.
 
+### v1.4.0 — Extension seams & AGPL *(shipped 2026-07-17)*
+`AuthBackend` trait (the shared-token auth becomes one pluggable implementation) and a mutation event hook (no-op by default; audit sinks plug in) — the seams alternative auth backends build on. **License: the project is AGPL-3.0-only as of this release**; contributions require the [CLA](CLA.md).
+
 ### Post-1.0 candidates
 RBAC management · Prometheus historical charts (needs storage) · AI-assisted operations · open-core identity tier (per-user tokens, SSO/OIDC, audit log) · gRPC (deferred by the v1.2 profiling evidence).

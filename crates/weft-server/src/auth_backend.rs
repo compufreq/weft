@@ -103,7 +103,10 @@ mod tests {
     fn shared_token_backend_matches_original_behavior() {
         let open = SharedTokenBackend::new(None);
         assert!(!open.required());
-        assert!(open.verify("anything").is_none(), "no token to verify against");
+        assert!(
+            open.verify("anything").is_none(),
+            "no token to verify against"
+        );
 
         let locked = SharedTokenBackend::new(Some(SecretString::from("s3cret")));
         assert!(locked.required());
