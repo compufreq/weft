@@ -47,6 +47,34 @@ impl WeaviateClient {
         &self.base_url
     }
 
+    /// Default Prometheus metrics URL for this instance: the base host with
+    /// Weaviate's metrics port (2112) and path `/metrics`.
+    pub fn derived_metrics_url(&self) -> Option<String> {
+        let mut url = self.base_url.clone();
+        url.set_port(Some(2112)).ok()?;
+        url.set_path("/metrics");
+        Some(url.to_string())
+    }
+
+    /// Fetch a text document from an absolute URL with the pooled client
+    /// (the metrics endpoint lives on its own port, outside `base_url`).
+    /// Uses a short timeout: metrics are polled and must fail fast.
+    pub async fn fetch_text(&self, url: &str) -> Result<String, Error> {
+        let url = Url::parse(url)?;
+        let resp = self
+            .http
+            .get(url)
+            .timeout(Duration::from_secs(5))
+            .send()
+            .await?;
+        let status = resp.status();
+        let body = resp.text().await?;
+        if !status.is_success() {
+            return Err(Error::Status { status, body });
+        }
+        Ok(body)
+    }
+
     fn url(&self, path: &str) -> Result<Url, Error> {
         Ok(self.base_url.join(path)?)
     }

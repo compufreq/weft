@@ -109,6 +109,7 @@ pub fn app_with_proxy(state: AppState, ssr: Option<SsrProxy>) -> Router {
             "/api/v1/instances/{id}/statistics",
             get(api::ops::statistics),
         )
+        .route("/api/v1/instances/{id}/metrics", get(api::ops::metrics))
         .route("/api/v1/instances/{id}/rbac", get(api::rbac::overview))
         .route(
             "/api/v1/instances/{id}/capabilities",

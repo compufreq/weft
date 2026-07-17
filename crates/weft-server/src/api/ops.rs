@@ -199,3 +199,44 @@ pub async fn backups_restore_status(
             .await?,
     ))
 }
+
+/// `GET /api/v1/instances/{id}/metrics` — a live snapshot of selected
+/// Prometheus series from Weaviate's metrics endpoint.
+///
+/// The URL comes from the instance's `metrics_url` config, falling back to
+/// the base host on Weaviate's default metrics port (`host:2112/metrics`).
+/// An unreachable endpoint degrades to `supported: false` instead of an
+/// error — metrics are optional (`PROMETHEUS_MONITORING_ENABLED`).
+pub async fn metrics(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    let instance = state
+        .instance(&id)
+        .ok_or_else(|| ApiError::InstanceNotFound(id))?;
+    let Some(url) = instance
+        .metrics_url
+        .clone()
+        .or_else(|| instance.client.derived_metrics_url())
+    else {
+        return Ok(Json(json!({
+            "supported": false,
+            "reason": "no metrics URL could be derived for this instance — set metrics_url",
+        })));
+    };
+
+    match instance.client.fetch_text(&url).await {
+        Ok(text) => {
+            let snapshot = weft_weaviate::metrics::parse_snapshot(&text);
+            let mut body = serde_json::to_value(snapshot).unwrap_or_else(|_| json!({}));
+            body["supported"] = json!(true);
+            Ok(Json(body))
+        }
+        Err(e) => Ok(Json(json!({
+            "supported": false,
+            "reason": format!(
+                "metrics endpoint not reachable ({e}) — enable PROMETHEUS_MONITORING_ENABLED=true on Weaviate or configure metrics_url"
+            ),
+        }))),
+    }
+}

@@ -23,6 +23,7 @@ fn test_app() -> axum::Router {
             name: "Local Weaviate".into(),
             url: weaviate_url(),
             api_key: None,
+            metrics_url: None,
         }],
         auth_token: None,
         read_only: false,
@@ -273,6 +274,7 @@ async fn unreachable_weaviate_is_502() {
             name: "Dead".into(),
             url: "http://127.0.0.1:1".into(), // nothing listens here
             api_key: None,
+            metrics_url: None,
         }],
         auth_token: None,
         read_only: false,

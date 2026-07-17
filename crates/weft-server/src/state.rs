@@ -20,6 +20,9 @@ pub struct Instance {
     /// Kept only so runtime instances can be persisted across restarts.
     /// Redacted in every API response and never logged.
     pub api_key: Option<SecretString>,
+    /// Optional explicit Prometheus metrics URL (config or runtime input).
+    /// When `None`, the metrics endpoint derives host:2112/metrics.
+    pub metrics_url: Option<String>,
 }
 
 /// On-disk shape of one persisted runtime instance.
@@ -33,6 +36,8 @@ struct PersistedInstance {
     url: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     api_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    metrics_url: Option<String>,
 }
 
 /// Shared application state. Cheap to clone.
@@ -75,6 +80,7 @@ impl AppState {
                     url: ic.url.clone(),
                     client,
                     api_key: ic.api_key.clone(),
+                    metrics_url: ic.metrics_url.clone(),
                 }),
             );
         }
@@ -119,6 +125,7 @@ impl AppState {
                             url: p.url,
                             client,
                             api_key,
+                            metrics_url: p.metrics_url,
                         }),
                     );
                 }
@@ -146,6 +153,7 @@ impl AppState {
                     name: i.name.clone(),
                     url: i.url.clone(),
                     api_key: i.api_key.as_ref().map(|k| k.expose_secret().to_string()),
+                    metrics_url: i.metrics_url.clone(),
                 }
             })
             .collect();

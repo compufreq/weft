@@ -14,6 +14,7 @@
 mod client;
 mod error;
 pub mod graphql;
+pub mod metrics;
 pub mod types;
 
 pub use client::{ObjectsQuery, WeaviateClient};

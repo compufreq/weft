@@ -54,6 +54,8 @@ pub struct AddInstance {
     pub url: String,
     /// Optional API key — accepted on input, never echoed back.
     pub api_key: Option<String>,
+    /// Optional Prometheus metrics URL (additive in 1.2).
+    pub metrics_url: Option<String>,
 }
 
 fn slugify(name: &str) -> String {
@@ -97,6 +99,7 @@ pub async fn add(
         url: body.url,
         client,
         api_key,
+        metrics_url: body.metrics_url.filter(|m| !m.is_empty()),
     };
     let added = state
         .add_instance(instance)

@@ -53,5 +53,8 @@ Security review (threat-model page over the full mutation surface), `/api/v1` st
 ### v1.1.0 — Explorer & UX upgrades *(shipped 2026-07-17)*
 CSV import (client-side RFC-4180 parsing, schema-typed columns, `id`/`vector` special columns, file picker), AND/OR + nested groups in the filter builder (additive `/api/v1` extension — the flat filter shape is unchanged), dark/light theme toggle with OS-preference fallback.
 
+### v1.2.0 — Performance & live metrics *(shipped 2026-07-17)*
+1M-object performance pass (browse/search single-digit-to-low-tens ms through the released image; numbers in the release notes), live Prometheus metrics on the ops page (heap, goroutines, CPU, requests/s, object counts, vector-index size — rolling in-browser window, no storage; per-instance `metrics_url`, graceful degrade). gRPC evaluated against the 1M profile and **deferred**: every Weft-path operation measured ≤30ms; the slow paths are Weaviate-side query work a transport change would not affect.
+
 ### Post-1.0 candidates
-1M-object performance pass · optional gRPC data path · Prometheus metrics & historical charts · RBAC management · AI-assisted operations · open-core identity tier (per-user tokens, SSO/OIDC, audit log).
+RBAC management · Prometheus historical charts (needs storage) · AI-assisted operations · open-core identity tier (per-user tokens, SSO/OIDC, audit log) · gRPC (deferred by the v1.2 profiling evidence).

@@ -33,9 +33,26 @@ instances:
     name: Staging cluster
     url: https://weaviate.staging.example.com
     api_key: "sk-..."
+    # Optional (v1.2+): where this instance's Prometheus metrics live.
+    # When omitted, Weft tries the base host on port 2112.
+    metrics_url: https://weaviate.staging.example.com:2112/metrics
 ```
 
 Environment variables prefixed `WEFT_` override file values.
+
+## Live metrics (v1.2+)
+
+The ops page shows live charts (heap, goroutines, CPU, requests/s, object
+counts) when Weaviate's Prometheus endpoint is reachable:
+
+- Start Weaviate with `PROMETHEUS_MONITORING_ENABLED=true` (it serves metrics
+  on port **2112**).
+- By default Weft scrapes `http://<weaviate-host>:2112/metrics`; set
+  `metrics_url` per instance in `weft.yaml` (or when adding an instance via
+  the API) if yours lives elsewhere.
+- No storage is involved: Weft folds the scrape into a small JSON snapshot
+  and the browser keeps a ~5-minute rolling window. When the endpoint is
+  unreachable, the panel says so and the rest of the ops page is unaffected.
 
 ## Runtime instances
 

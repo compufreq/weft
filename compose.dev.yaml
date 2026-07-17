@@ -16,8 +16,10 @@ services:
       BACKUP_FILESYSTEM_PATH: /var/lib/weaviate/backups
       QUERY_DEFAULTS_LIMIT: "25"
       CLUSTER_HOSTNAME: node1
+      PROMETHEUS_MONITORING_ENABLED: "true"
     ports:
       - "8181:8080"
+      - "8182:2112" # Prometheus metrics (host access; in-network uses weaviate:2112)
     volumes:
       - weaviate-data:/var/lib/weaviate
 

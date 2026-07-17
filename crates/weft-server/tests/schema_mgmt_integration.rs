@@ -21,6 +21,7 @@ fn test_app() -> axum::Router {
             name: "Local".into(),
             url: weaviate_url(),
             api_key: None,
+            metrics_url: None,
         }],
         auth_token: None,
         read_only: false,

@@ -264,6 +264,19 @@ export interface ClusterStatistics {
   synchronized?: boolean;
 }
 
+/** Live Prometheus snapshot from the backend's metrics proxy. */
+export interface MetricsSnapshot {
+  supported: boolean;
+  reason?: string;
+  heap_inuse_bytes?: number | null;
+  goroutines?: number | null;
+  cpu_seconds_total?: number | null;
+  objects_total?: number | null;
+  objects_by_class?: { class: string; count: number }[];
+  vector_index_size?: number | null;
+  requests_total?: number | null;
+}
+
 export const api = {
   instances: () => fetchJson<InstanceSummary[]>("/api/v1/instances"),
   addInstance: (input: AddInstanceInput) =>
@@ -433,6 +446,10 @@ export const api = {
   statistics: (instanceId: string) =>
     fetchJson<ClusterStatistics>(
       `/api/v1/instances/${encodeURIComponent(instanceId)}/statistics`,
+    ),
+  metrics: (instanceId: string) =>
+    fetchJson<MetricsSnapshot>(
+      `/api/v1/instances/${encodeURIComponent(instanceId)}/metrics`,
     ),
   nodes: (instanceId: string) =>
     fetchJson<{ nodes: ClusterNode[] }>(

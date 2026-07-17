@@ -21,6 +21,7 @@ fn test_app() -> axum::Router {
             name: "Local".into(),
             url: weaviate_url(),
             api_key: None,
+            metrics_url: None,
         }],
         auth_token: None,
         read_only: false,
@@ -220,4 +221,54 @@ async fn rbac_degrades_gracefully_on_anonymous_instances() {
         assert!(rbac["roles"].is_array(), "{rbac}");
         assert!(rbac["users"].is_array(), "{rbac}");
     }
+}
+
+// ---------- Prometheus metrics (v1.2) ----------
+
+#[tokio::test]
+async fn metrics_snapshot_reports_go_runtime_series() {
+    let (status, body) = request("GET", "/api/v1/instances/local/metrics", None).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["supported"], true, "{body}");
+    // Go runtime families exist on every Weaviate version with monitoring on.
+    assert!(body["goroutines"].as_f64().unwrap() > 0.0, "{body}");
+    assert!(body["heap_inuse_bytes"].as_f64().unwrap() > 0.0, "{body}");
+    assert!(body["cpu_seconds_total"].as_f64().unwrap() > 0.0, "{body}");
+}
+
+#[tokio::test]
+async fn metrics_degrade_cleanly_when_endpoint_unreachable() {
+    // Same Weaviate, but metrics_url pointing at a closed port.
+    let config = Config {
+        listen: "0.0.0.0:0".into(),
+        instances: vec![InstanceConfig {
+            id: "local".into(),
+            name: "Local".into(),
+            url: weaviate_url(),
+            api_key: None,
+            metrics_url: Some("http://127.0.0.1:9/metrics".into()),
+        }],
+        auth_token: None,
+        read_only: false,
+        instances_file: None,
+    };
+    let app = app(AppState::from_config(&config).expect("valid test config"));
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/instances/local/metrics")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let bytes = response.into_body().collect().await.unwrap().to_bytes();
+    let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(body["supported"], false, "{body}");
+    assert!(
+        body["reason"].as_str().unwrap().contains("not reachable"),
+        "{body}"
+    );
 }

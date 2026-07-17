@@ -1,6 +1,10 @@
 import { A, useParams } from "@solidjs/router";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import BackupsTable from "~/components/ops/BackupsTable";
+import MetricsPanel, {
+  pushSample,
+  type MetricsSample,
+} from "~/components/ops/MetricsPanel";
 import NodesPanel from "~/components/ops/NodesPanel";
 import RbacPanel from "~/components/ops/RbacPanel";
 import StatsCard from "~/components/ops/StatsCard";
@@ -53,6 +57,17 @@ export default function OpsPage() {
   const [rbac, setRbac] = createSignal<RbacOverview | null>(null);
   const [stats, setStats] = createSignal<ClusterStatistics | null>(null);
 
+  // Live metrics: rolling in-browser window, polled with the page.
+  const [metricsWindow, setMetricsWindow] = createSignal<MetricsSample[]>([]);
+  const refreshMetrics = async () => {
+    try {
+      const snapshot = await api.metrics(instanceId());
+      setMetricsWindow((w) => pushSample(w, { at: Date.now(), snapshot }));
+    } catch {
+      // Metrics are auxiliary — a failed scrape just skips a sample.
+    }
+  };
+
   onMount(() => {
     void (async () => {
       await refreshNodes();
@@ -77,8 +92,12 @@ export default function OpsPage() {
       } catch {
         setStats(null);
       }
+      void refreshMetrics();
     })();
-    const timer = setInterval(() => void refreshNodes(), POLL_MS);
+    const timer = setInterval(() => {
+      void refreshNodes();
+      void refreshMetrics();
+    }, POLL_MS);
     onCleanup(() => clearInterval(timer));
   });
 
@@ -233,6 +252,11 @@ export default function OpsPage() {
           <BackupsTable backups={backups()} onRestore={(b) => void restoreBackup(b)} />
         </div>
       </Show>
+
+      <h2 class="mt-8 text-lg font-semibold tracking-tight">Live metrics</h2>
+      <div class="mt-3">
+        <MetricsPanel window={metricsWindow()} />
+      </div>
 
       <div class="mt-6 grid gap-6 lg:grid-cols-2">
         <Show when={stats()}>{(s) => <StatsCard stats={s()} />}</Show>

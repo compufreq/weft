@@ -22,6 +22,10 @@ pub struct InstanceConfig {
     /// Optional API key. Redacted in every API response and never logged.
     #[serde(default, skip_serializing)]
     pub api_key: Option<SecretString>,
+    /// Optional Prometheus metrics URL. When unset, Weft tries the base
+    /// host on Weaviate's default metrics port (`http://host:2112/metrics`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metrics_url: Option<String>,
 }
 
 /// Top-level Weft configuration.
@@ -56,6 +60,7 @@ impl Default for Config {
                 api_key: std::env::var("WEAVIATE_API_KEY")
                     .ok()
                     .map(SecretString::from),
+                metrics_url: None,
             }],
             auth_token: None,
             read_only: false,
@@ -105,6 +110,7 @@ mod tests {
                 name: "X".into(),
                 url: "http://w:8080".into(),
                 api_key: Some(SecretString::from("super-secret")),
+                metrics_url: None,
             }],
             auth_token: Some(SecretString::from("guard-secret")),
             read_only: false,
