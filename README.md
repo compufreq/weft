@@ -68,7 +68,14 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Conventional commits required.
 
 ## License
 
-[AGPL-3.0](LICENSE)
+[AGPL-3.0](LICENSE) (as of v1.4.0). You can run, modify, and self-host Weft
+freely; if you modify it and offer it to others over a network, the AGPL
+requires you to publish your modifications under the same license.
+
+Commercial features (per-user access, SSO/OIDC, audit log) are developed
+separately as **Weft Pro** under a commercial license. Contributions to this
+repository require agreeing to the [CLA](CLA.md) — see
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 

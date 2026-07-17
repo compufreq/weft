@@ -2,6 +2,20 @@
 
 Thanks for your interest! Weft is early-stage — issues and PRs are welcome.
 
+## License and CLA
+
+Weft is licensed under [AGPL-3.0](LICENSE) (since v1.4.0). Alongside the
+open project, commercial features are developed as **Weft Pro** under a
+separate license. To keep that model workable, **all contributions require
+agreeing to the [Contributor License Agreement](CLA.md)** before they can
+be merged: you keep the copyright to your contribution and grant the
+project the right to use it in both the AGPL and commercial editions —
+the same arrangement Grafana and GitLab use.
+
+To agree, include this line in the description of your first pull request:
+
+> I have read and agree to the Weft CLA (CLA.md at the revision this PR targets).
+
 ## Ground rules
 
 - **Everything runs in Docker.** You need Docker and nothing else — no local Rust or Node toolchains. All build/test/lint commands are wrapped in the [Makefile](Makefile).
