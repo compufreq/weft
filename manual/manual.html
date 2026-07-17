@@ -73,7 +73,7 @@
   <h1>Weft User Manual</h1>
   <div class="subtitle">The missing UI for Weaviate &mdash; zero-config, self-hosted, open source</div>
   <div class="meta">
-    Version 1.0.0 &middot; July 2026<br>
+    Version 1.1.0 &middot; July 2026<br>
     github.com/compufreq/weft &middot; compufreq.github.io/weft<br><br>
     Weft is an independent open-source project, not affiliated with Weaviate B.V.
   </div>
@@ -114,10 +114,11 @@
     <li>Start the container, pointing it at your Weaviate:
 <pre><code>docker run -d -p 8080:8080 \
   -e WEAVIATE_URL=http://your-weaviate:8080 \
-  ghcr.io/compufreq/weft:1.0</code></pre></li>
+  ghcr.io/compufreq/weft:1.1</code></pre></li>
     <li>Open <code>http://localhost:8080</code> in your browser.</li>
     <li>Your Weaviate appears on the <b>Instances</b> page, ready to browse. That is the whole setup.</li>
   </ol>
+  <div class="note">Weft follows your operating system's dark/light preference. The <b>theme selector</b> in the navigation bar overrides it (System / Light / Dark); the choice is remembered by your browser.</div>
   <div class="note">If your Weaviate needs an API key, add <code>-e WEAVIATE_API_KEY=your-key</code>. The key stays inside the Weft container &mdash; your browser never talks to Weaviate directly.</div>
   <h3>Docker Compose</h3>
 <pre><code>services:
@@ -125,7 +126,7 @@
     image: cr.weaviate.io/semitechnologies/weaviate:1.37.2
     # ... your existing Weaviate config ...
   weft:
-    image: ghcr.io/compufreq/weft:1.0
+    image: ghcr.io/compufreq/weft:1.1
     environment:
       WEAVIATE_URL: http://weaviate:8080
     ports:
@@ -159,7 +160,7 @@
 <pre><code>docker run -d -p 8080:8080 \
   -e WEAVIATE_URL=http://weaviate:8080 \
   -e WEFT_AUTH_TOKEN=$(openssl rand -hex 24) \
-  ghcr.io/compufreq/weft:1.0</code></pre></li>
+  ghcr.io/compufreq/weft:1.1</code></pre></li>
     <li>Visiting Weft now shows the token prompt. Enter the token and click <b>Unlock</b>.</li>
     <li>Your browser receives a secure session cookie valid for 7 days. A <b>Log out</b> button appears in the navigation bar; clicking it ends the session immediately.</li>
   </ol>
@@ -266,9 +267,10 @@
   <p class="caption">A category filter applied: the table, the match count and the facet bars all reflect it.</p>
   <ol class="steps">
     <li>Click <b>+ Add filter</b>. Pick a <b>property</b>, an <b>operator</b> and a <b>value</b>. Operators adapt to the property type &mdash; text offers <code>Equal</code>/<code>Like</code>/<code>ContainsAny</code>, numbers offer comparisons, and <code>IsNull</code> finds missing values.</li>
-    <li>Add more rows to combine conditions (they AND together), then click <b>Apply filters</b>.</li>
-    <li><code>Like</code> supports wildcards: <code>*science*</code> matches anywhere in the text. <code>ContainsAny</code> takes a comma-separated list.</li>
-    <li><b>Clear</b> removes all filters.</li>
+    <li>Add more rows to combine conditions. With two or more, a <b>match mode</b> select appears: <b>Match all (AND)</b> or <b>Match any (OR)</b>.</li>
+    <li>Click <b>+ Add group</b> for nested logic &mdash; e.g. <i>wordCount &lt; 100 <b>and</b> (category = science <b>or</b> category = sports)</i>. Each group has its own match mode; a new group starts in the opposite mode of its parent, which is usually what you want. Groups nest up to three levels.</li>
+    <li>Click <b>Apply filters</b> to run. <code>Like</code> supports wildcards: <code>*science*</code> matches anywhere in the text. <code>ContainsAny</code> takes a comma-separated list.</li>
+    <li><b>Clear</b> removes all filters and groups.</li>
   </ol>
   <h3>Aggregate</h3>
   <ol class="steps">
@@ -335,7 +337,8 @@
   <p class="caption">Importing NDJSON: two lines inserted, with a per-item error report when something is rejected.</p>
   <ol class="steps">
     <li>Open the <b>Import</b> tab.</li>
-    <li>Paste either a <b>JSON array</b> of objects or <b>NDJSON</b> (one JSON object per line). Weft's own NDJSON export re-imports directly, so export &rarr; import moves data between collections or instances.</li>
+    <li>Paste a <b>JSON array</b> of objects, <b>NDJSON</b> (one JSON object per line), or <b>CSV</b> with a header row &mdash; or load any of these from a file with the file picker. Weft's own NDJSON export re-imports directly, so export &rarr; import moves data between collections or instances.</li>
+    <li>For CSV, the header names the properties and values are typed from the collection schema (<code>int</code>, <code>number</code> and <code>boolean</code> columns are converted; quoted fields with commas work as usual). Two optional special columns: <code>id</code> sets the object UUID and <code>vector</code> takes a quoted JSON array like <code>"[0.1, 0.2]"</code>. Empty cells are simply omitted. Parsing happens entirely in your browser.</li>
     <li>Click <b>Import</b>. Objects are inserted in batches (up to 10,000 per import).</li>
     <li>The report shows how many were <b>inserted</b> and <b>failed</b>, with Weaviate's exact error and the line number for each failure &mdash; one bad row never aborts the rest.</li>
   </ol>
@@ -428,7 +431,7 @@ instances:
     api_key: "sk-..."</code></pre>
   <div class="warn">API keys in <code>weft.yaml</code> and in the instances file are stored in plain text &mdash; protect those volumes. Keys are never shown in the UI or API responses.</div>
   <h3>Upgrades</h3>
-  <p>Weft is stateless: upgrading is <code>docker pull</code> + recreate. Your Weaviate data is never touched. The <code>/api/v1</code> HTTP API is stable across all 1.x releases (additive changes only). Pin at least the minor tag (<code>ghcr.io/compufreq/weft:1.0</code>) in production.</p>
+  <p>Weft is stateless: upgrading is <code>docker pull</code> + recreate. Your Weaviate data is never touched. The <code>/api/v1</code> HTTP API is stable across all 1.x releases (additive changes only). Pin at least the minor tag (<code>ghcr.io/compufreq/weft:1.1</code>) in production.</p>
 </div>
 
 <div class="chapter">
