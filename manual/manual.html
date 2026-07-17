@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Weft User Manual</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", -apple-system, Roboto, Arial, sans-serif;
+    color: #18181b; font-size: 10.5pt; line-height: 1.55; margin: 0;
+  }
+  h1, h2, h3 { font-weight: 650; letter-spacing: -0.01em; color: #111; }
+  h1 { font-size: 22pt; margin: 0 0 4pt; }
+  h2 { font-size: 15pt; margin: 0 0 10pt; padding-bottom: 6pt; border-bottom: 2px solid #7c3aed; }
+  h3 { font-size: 11.5pt; margin: 14pt 0 5pt; }
+  p { margin: 5pt 0; }
+  code {
+    font-family: "Cascadia Mono", Consolas, monospace; font-size: 9pt;
+    background: #f4f4f5; border: 1px solid #e4e4e7; border-radius: 3px; padding: 0 3px;
+  }
+  pre {
+    font-family: "Cascadia Mono", Consolas, monospace; font-size: 8.6pt; line-height: 1.45;
+    background: #fafafa; border: 1px solid #e4e4e7; border-radius: 6px;
+    padding: 8pt 10pt; overflow: hidden; white-space: pre-wrap;
+  }
+  pre code { background: none; border: none; padding: 0; }
+  .chapter { page-break-before: always; }
+  .screenshot {
+    width: 100%; border: 1px solid #d4d4d8; border-radius: 6px;
+    margin: 8pt 0 4pt; page-break-inside: avoid;
+  }
+  .caption { font-size: 8.5pt; color: #71717a; margin: 0 0 10pt; }
+  ol.steps { margin: 6pt 0; padding-left: 18pt; }
+  ol.steps > li { margin: 4pt 0; }
+  ol.steps > li::marker { color: #7c3aed; font-weight: 600; }
+  table { border-collapse: collapse; width: 100%; margin: 8pt 0; font-size: 9.2pt; }
+  th, td { border: 1px solid #d4d4d8; padding: 4pt 6pt; text-align: left; vertical-align: top; }
+  th { background: #f4f4f5; font-weight: 600; }
+  .note {
+    border-left: 3px solid #7c3aed; background: #f5f3ff;
+    padding: 6pt 9pt; margin: 8pt 0; border-radius: 0 5px 5px 0; font-size: 9.6pt;
+  }
+  .warn {
+    border-left: 3px solid #d97706; background: #fffbeb;
+    padding: 6pt 9pt; margin: 8pt 0; border-radius: 0 5px 5px 0; font-size: 9.6pt;
+  }
+  .danger {
+    border-left: 3px solid #dc2626; background: #fef2f2;
+    padding: 6pt 9pt; margin: 8pt 0; border-radius: 0 5px 5px 0; font-size: 9.6pt;
+  }
+  /* Cover */
+  .cover { height: 250mm; display: flex; flex-direction: column; justify-content: center; }
+  .cover .glyph { font-size: 44pt; color: #7c3aed; }
+  .cover h1 { font-size: 34pt; margin: 8pt 0 2pt; }
+  .cover .subtitle { font-size: 14pt; color: #52525b; }
+  .cover .meta { margin-top: 28pt; color: #71717a; font-size: 10pt; }
+  /* TOC */
+  .toc { page-break-before: always; }
+  .toc ol { list-style: none; padding-left: 0; font-size: 11pt; }
+  .toc li { margin: 5pt 0; }
+  .toc .n { display: inline-block; width: 22pt; color: #7c3aed; font-weight: 600; }
+  kbd {
+    font-family: inherit; font-size: 8.6pt; border: 1px solid #a1a1aa;
+    border-bottom-width: 2px; border-radius: 3px; padding: 0 4px; background: #fff;
+  }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="glyph">&#9670;</div>
+  <h1>Weft User Manual</h1>
+  <div class="subtitle">The missing UI for Weaviate &mdash; zero-config, self-hosted, open source</div>
+  <div class="meta">
+    Version 1.0.0 &middot; July 2026<br>
+    github.com/compufreq/weft &middot; compufreq.github.io/weft<br><br>
+    Weft is an independent open-source project, not affiliated with Weaviate B.V.
+  </div>
+</div>
+
+<div class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><span class="n">1</span> Getting started</li>
+    <li><span class="n">2</span> Managing instances</li>
+    <li><span class="n">3</span> Authentication &amp; read-only mode</li>
+    <li><span class="n">4</span> Browsing schemas</li>
+    <li><span class="n">5</span> Creating &amp; managing collections</li>
+    <li><span class="n">6</span> Collection aliases</li>
+    <li><span class="n">7</span> Exploring objects: browse, filter &amp; aggregate</li>
+    <li><span class="n">8</span> Searching: keyword, vector &amp; hybrid</li>
+    <li><span class="n">9</span> The vector map</li>
+    <li><span class="n">10</span> Editing data: create, edit, delete &amp; import</li>
+    <li><span class="n">11</span> The GraphQL console</li>
+    <li><span class="n">12</span> Multi-tenancy</li>
+    <li><span class="n">13</span> Operations: cluster health, backups &amp; RBAC</li>
+    <li><span class="n">14</span> Comparing schemas (diff)</li>
+    <li><span class="n">15</span> Configuration reference</li>
+    <li><span class="n">16</span> Troubleshooting</li>
+  </ol>
+</div>
+
+<div class="chapter">
+  <h2>1&ensp;Getting started</h2>
+  <p>Weft is a single container that runs next to your Weaviate instance. It needs no account, no configuration file, and no build step.</p>
+  <h3>Requirements</h3>
+  <ul>
+    <li>Docker (or any OCI runtime). Images are published for <b>amd64 and arm64</b>.</li>
+    <li>A reachable Weaviate instance (1.30 or newer; the latest two minor versions are fully tested).</li>
+  </ul>
+  <h3>Run Weft</h3>
+  <ol class="steps">
+    <li>Start the container, pointing it at your Weaviate:
+<pre><code>docker run -d -p 8080:8080 \
+  -e WEAVIATE_URL=http://your-weaviate:8080 \
+  ghcr.io/compufreq/weft:1.0</code></pre></li>
+    <li>Open <code>http://localhost:8080</code> in your browser.</li>
+    <li>Your Weaviate appears on the <b>Instances</b> page, ready to browse. That is the whole setup.</li>
+  </ol>
+  <div class="note">If your Weaviate needs an API key, add <code>-e WEAVIATE_API_KEY=your-key</code>. The key stays inside the Weft container &mdash; your browser never talks to Weaviate directly.</div>
+  <h3>Docker Compose</h3>
+<pre><code>services:
+  weaviate:
+    image: cr.weaviate.io/semitechnologies/weaviate:1.37.2
+    # ... your existing Weaviate config ...
+  weft:
+    image: ghcr.io/compufreq/weft:1.0
+    environment:
+      WEAVIATE_URL: http://weaviate:8080
+    ports:
+      - "8080:8080"</code></pre>
+</div>
+
+<div class="chapter">
+  <h2>2&ensp;Managing instances</h2>
+  <p>One Weft deployment can manage any number of Weaviate instances. The home page lists every registered instance.</p>
+  <img class="screenshot" src="shots/01-instances.png" alt="Instances page">
+  <p class="caption">The Instances page: registered instances on the left, the Add instance form on the right.</p>
+  <h3>Add an instance at runtime</h3>
+  <ol class="steps">
+    <li>On the home page, fill in the <b>Add instance</b> form: a display <b>Name</b> (e.g. &ldquo;Staging cluster&rdquo;) and the <b>URL</b> of the Weaviate HTTP API.</li>
+    <li>If the instance requires authentication, paste its <b>API key</b>. The key is accepted once and never shown again.</li>
+    <li>Click <b>Add instance</b>. A new card appears; click <b>Browse schema &rarr;</b> to start exploring it.</li>
+  </ol>
+  <h3>Remove an instance</h3>
+  <ol class="steps">
+    <li>On the instance card, click <b>Remove</b>. This only deregisters the connection &mdash; nothing is deleted on the Weaviate side.</li>
+  </ol>
+  <div class="note"><b>Do my instances survive a restart?</b> Instances added in the UI are kept in memory. To persist them, start Weft with <code>WEFT_INSTANCES_FILE=/data/instances.json</code> and mount a volume at <code>/data</code> &mdash; every add/remove is then saved automatically. Fleet-style permanent configs belong in <code>weft.yaml</code> (see chapter 15).</div>
+</div>
+
+<div class="chapter">
+  <h2>3&ensp;Authentication &amp; read-only mode</h2>
+  <p>By default Weft is open &mdash; anyone who can reach the port can use it. Two deployment switches lock it down.</p>
+  <h3>Protect the deployment with a token</h3>
+  <ol class="steps">
+    <li>Generate a strong token and start Weft with it:
+<pre><code>docker run -d -p 8080:8080 \
+  -e WEAVIATE_URL=http://weaviate:8080 \
+  -e WEFT_AUTH_TOKEN=$(openssl rand -hex 24) \
+  ghcr.io/compufreq/weft:1.0</code></pre></li>
+    <li>Visiting Weft now shows the token prompt. Enter the token and click <b>Unlock</b>.</li>
+    <li>Your browser receives a secure session cookie valid for 7 days. A <b>Log out</b> button appears in the navigation bar; clicking it ends the session immediately.</li>
+  </ol>
+  <img class="screenshot" src="shots/16-auth-gate.png" alt="Authentication gate">
+  <p class="caption">The token gate. Wrong tokens are rejected, and more than 5 attempts per minute are throttled with a countdown.</p>
+  <div class="note">API clients (scripts, curl) authenticate with a header instead: <code>Authorization: Bearer &lt;token&gt;</code>. Health probes (<code>/healthz</code>, <code>/readyz</code>) always stay open for orchestrators.</div>
+  <h3>Read-only mode</h3>
+  <ol class="steps">
+    <li>Start Weft with <code>-e WEFT_READ_ONLY=true</code>.</li>
+    <li>An amber banner appears on every page, and every write control in the UI disappears &mdash; no New collection, no editing, no imports, no backups.</li>
+    <li>Browsing, filtering, search, aggregations, the GraphQL console, and exports keep working normally.</li>
+  </ol>
+  <img class="screenshot" src="shots/17-read-only.png" alt="Read-only mode">
+  <p class="caption">Read-only mode: the banner is visible and all write controls are hidden. The server also rejects any mutation, so the protection does not depend on the UI.</p>
+  <div class="note">Combine both switches to give a whole team safe visibility: a read-only deployment with a shared token.</div>
+</div>
+
+<div class="chapter">
+  <h2>4&ensp;Browsing schemas</h2>
+  <p>Click <b>Browse schema &rarr;</b> on any instance card to see its collections.</p>
+  <img class="screenshot" src="shots/02-schema.png" alt="Schema page">
+  <p class="caption">The Schema page: every collection with its vectorizer, index type and multi-tenancy status, plus the alias panel at the bottom.</p>
+  <ol class="steps">
+    <li>The table lists every collection. Click a collection name for its detail page.</li>
+    <li><b>Export JSON</b> downloads the complete schema as a file &mdash; useful for backups and for diffing later.</li>
+    <li>The buttons at the top right lead to <b>Compare&hellip;</b> (chapter 14), <b>Ops</b> (chapter 13) and the <b>Console</b> (chapter 11).</li>
+  </ol>
+  <h3>Collection detail</h3>
+  <img class="screenshot" src="shots/04-class-detail.png" alt="Collection detail page">
+  <p class="caption">A collection's detail page: vectorizer, index type, the full property table, and management actions.</p>
+  <ol class="steps">
+    <li>The summary cards show the <b>vectorizer</b>, <b>vector index</b> type and property count.</li>
+    <li>The <b>Properties</b> table lists every property with its data type.</li>
+    <li>Expand <b>Raw definition (JSON)</b> to inspect the exact class definition Weaviate stores.</li>
+    <li><b>Browse objects &rarr;</b> jumps to the data explorer for this collection (chapter 7).</li>
+  </ol>
+</div>
+
+<div class="chapter">
+  <h2>5&ensp;Creating &amp; managing collections</h2>
+  <h3>Create a collection</h3>
+  <img class="screenshot" src="shots/03-new-collection.png" alt="New collection form">
+  <p class="caption">The guided New collection form. The raw JSON toggle accepts a full class definition for advanced setups.</p>
+  <ol class="steps">
+    <li>On the Schema page, click <b>New collection</b>.</li>
+    <li>Enter a <b>Name</b> &mdash; UpperCamelCase, e.g. <code>Product</code>.</li>
+    <li>Tick <b>Multi-tenant</b> if each of your customers/tenants should get isolated data (chapter 12).</li>
+    <li>Add <b>properties</b>: a name plus a type (<code>text</code>, <code>int</code>, <code>number</code>, <code>boolean</code>, <code>date</code>, <code>text[]</code>, <code>uuid</code>). Use <b>+ Add property</b> for more rows.</li>
+    <li>Click <b>Create collection</b>. It appears in the schema table immediately.</li>
+  </ol>
+  <div class="note">The form creates collections with <code>vectorizer: none</code> (bring your own vectors). To configure a vectorizer module, tick <b>raw JSON</b> and paste a complete class definition instead.</div>
+  <h3>Add a property to an existing collection</h3>
+  <ol class="steps">
+    <li>Open the collection's detail page.</li>
+    <li>Below the property table, enter the <b>Property name</b> and pick a <b>Type</b>.</li>
+    <li>Click <b>Add property</b>. (Adding is the only in-place schema change Weaviate supports &mdash; renaming or retyping a property requires a migration to a new collection.)</li>
+  </ol>
+  <h3>Delete a collection</h3>
+  <img class="screenshot" src="shots/05-delete-confirm.png" alt="Delete confirmation">
+  <p class="caption">Deletion is armed only after typing the exact collection name.</p>
+  <ol class="steps">
+    <li>On the detail page, click <b>Delete collection&hellip;</b>.</li>
+    <li>Type the collection's exact name into the confirmation box &mdash; the red button stays disabled until it matches.</li>
+    <li>Click <b>Delete forever</b>.</li>
+  </ol>
+  <div class="danger">Deleting a collection permanently removes <b>every object in it</b> on the Weaviate side. There is no undo. Consider a backup first (chapter 13).</div>
+</div>
+
+<div class="chapter">
+  <h2>6&ensp;Collection aliases</h2>
+  <p>Aliases (Weaviate &ge; 1.32) let applications query a stable name like <code>ArticlesLive</code> while you swap the underlying collection &mdash; the standard pattern for zero-downtime reindexing and migrations.</p>
+  <p>The <b>Aliases</b> panel sits at the bottom of the Schema page (visible in the chapter 4 screenshot).</p>
+  <h3>Create an alias</h3>
+  <ol class="steps">
+    <li>In the Aliases panel, type the <b>New alias</b> name.</li>
+    <li>Choose the collection it <b>Points at</b>.</li>
+    <li>Click <b>Create alias</b>.</li>
+  </ol>
+  <h3>Repoint an alias (migration cut-over)</h3>
+  <ol class="steps">
+    <li>Build and fill your new collection (e.g. <code>ArticleV2</code>).</li>
+    <li>In the alias row, change the target dropdown from <code>ArticleV1</code> to <code>ArticleV2</code>. The switch is instant for every client using the alias.</li>
+  </ol>
+  <h3>Delete an alias</h3>
+  <ol class="steps">
+    <li>Click the <b>&times;</b> on the alias row. Only the alias is removed &mdash; the target collection and its data stay untouched.</li>
+  </ol>
+  <div class="note">On Weaviate older than 1.32 the panel simply explains that aliases are not available &mdash; nothing breaks.</div>
+</div>
+
+<div class="chapter">
+  <h2>7&ensp;Exploring objects: browse, filter &amp; aggregate</h2>
+  <p>From a collection's detail page, click <b>Browse objects &rarr;</b>. The explorer has four tabs: <b>Browse</b>, <b>Search</b>, <b>Map</b> and <b>Import</b>.</p>
+  <img class="screenshot" src="shots/06-browse.png" alt="Object browser">
+  <p class="caption">Browse: the object table with live aggregations above it and the JSON detail panel on the right.</p>
+  <h3>Browse and inspect</h3>
+  <ol class="steps">
+    <li>Objects load 25 at a time; click <b>Load more</b> to append the next page (cursor-based, fast at any collection size).</li>
+    <li>Click any row to open the full object as JSON in the right-hand panel.</li>
+    <li><b>Export NDJSON</b> (top right) streams the entire collection to a file, one JSON object per line &mdash; constant memory, any size.</li>
+  </ol>
+  <h3>Filter</h3>
+  <img class="screenshot" src="shots/07-filters-facets.png" alt="Filters and facets">
+  <p class="caption">A category filter applied: the table, the match count and the facet bars all reflect it.</p>
+  <ol class="steps">
+    <li>Click <b>+ Add filter</b>. Pick a <b>property</b>, an <b>operator</b> and a <b>value</b>. Operators adapt to the property type &mdash; text offers <code>Equal</code>/<code>Like</code>/<code>ContainsAny</code>, numbers offer comparisons, and <code>IsNull</code> finds missing values.</li>
+    <li>Add more rows to combine conditions (they AND together), then click <b>Apply filters</b>.</li>
+    <li><code>Like</code> supports wildcards: <code>*science*</code> matches anywhere in the text. <code>ContainsAny</code> takes a comma-separated list.</li>
+    <li><b>Clear</b> removes all filters.</li>
+  </ol>
+  <h3>Aggregate</h3>
+  <ol class="steps">
+    <li>The <b>Aggregations</b> card always shows the count of objects matching the current filters.</li>
+    <li>Choose a property under <b>Facet by</b> to see value distribution as sorted bars (e.g. objects per category). Facets respect the active filters.</li>
+  </ol>
+</div>
+
+<div class="chapter">
+  <h2>8&ensp;Searching: keyword, vector &amp; hybrid</h2>
+  <img class="screenshot" src="shots/08-search.png" alt="Search results">
+  <p class="caption">A BM25 search with ranked, scored results. The active filter from the filter bar constrains the search too.</p>
+  <ol class="steps">
+    <li>Switch to the <b>Search</b> tab and pick a <b>Mode</b>:
+      <table>
+        <tr><th>Mode</th><th>What it does</th><th>Needs</th></tr>
+        <tr><td><b>BM25</b></td><td>Classic keyword relevance</td><td>nothing extra</td></tr>
+        <tr><td><b>Hybrid</b></td><td>Fuses keyword + vector ranking</td><td>optional vector</td></tr>
+        <tr><td><b>nearVector</b></td><td>Similarity to a raw vector you paste</td><td>a JSON vector, e.g. <code>[0.1, 0.2, &hellip;]</code></td></tr>
+        <tr><td><b>nearText</b></td><td>Semantic search from plain text</td><td>a vectorizer module on the collection</td></tr>
+      </table></li>
+    <li>Type your query (or paste a vector) and click <b>Search</b>.</li>
+    <li>Results are ranked with their <b>score</b> (BM25/hybrid) or <b>distance</b> (vector). Click a hit to inspect its full JSON.</li>
+    <li>Filters set on the filter bar apply to searches as well &mdash; e.g. search &ldquo;demo&rdquo; only within <code>category = science</code>.</li>
+  </ol>
+  <div class="note">If nearText reports that no vectorizer is configured, the collection stores raw vectors only &mdash; use nearVector or hybrid instead.</div>
+</div>
+
+<div class="chapter">
+  <h2>9&ensp;The vector map</h2>
+  <img class="screenshot" src="shots/09-map.png" alt="Vector map">
+  <p class="caption">The Map tab: every object vector projected to 2D. Nearby points are semantically similar; colors follow the most facet-like text property.</p>
+  <ol class="steps">
+    <li>Open the <b>Map</b> tab. Weft loads up to 200 objects with their vectors and projects them to two dimensions (PCA) directly in your browser.</li>
+    <li>Points that sit close together are similar in vector space &mdash; clusters usually mean coherent topics; outliers are worth inspecting.</li>
+    <li>Hover a point for its label; click it to load the full object into the detail panel.</li>
+    <li>The legend shows the automatic coloring &mdash; Weft picks the text property with the fewest distinct values (e.g. <code>category</code>).</li>
+  </ol>
+  <div class="note">If the collection stores no vectors (objects inserted without them and no vectorizer), the map explains that instead of showing an empty plot.</div>
+</div>
+
+<div class="chapter">
+  <h2>10&ensp;Editing data: create, edit, delete &amp; import</h2>
+  <div class="warn">All of this chapter is unavailable in read-only deployments &mdash; the controls are hidden and the server rejects the operations.</div>
+  <h3>Create one object</h3>
+  <ol class="steps">
+    <li>In the explorer, click <b>New object</b> (top right).</li>
+    <li>Enter the properties as a JSON object, e.g. <code>{ "title": "Hello", "wordCount": 42 }</code>.</li>
+    <li>Click <b>Save</b>. The list refreshes with your object included.</li>
+  </ol>
+  <h3>Edit an object</h3>
+  <img class="screenshot" src="shots/11-edit-object.png" alt="Object editor">
+  <p class="caption">The editor pre-filled with the selected object's properties.</p>
+  <ol class="steps">
+    <li>Select an object in the table, then click <b>Edit</b> in the detail panel header.</li>
+    <li>Change the JSON and click <b>Save</b>. This is a full replacement of the object's properties (Weaviate PUT semantics).</li>
+  </ol>
+  <h3>Delete an object</h3>
+  <ol class="steps">
+    <li>Select the object, click <b>Delete</b> in the detail panel header, and confirm. This cannot be undone.</li>
+  </ol>
+  <h3>Batch import</h3>
+  <img class="screenshot" src="shots/10-import.png" alt="Import tab">
+  <p class="caption">Importing NDJSON: two lines inserted, with a per-item error report when something is rejected.</p>
+  <ol class="steps">
+    <li>Open the <b>Import</b> tab.</li>
+    <li>Paste either a <b>JSON array</b> of objects or <b>NDJSON</b> (one JSON object per line). Weft's own NDJSON export re-imports directly, so export &rarr; import moves data between collections or instances.</li>
+    <li>Click <b>Import</b>. Objects are inserted in batches (up to 10,000 per import).</li>
+    <li>The report shows how many were <b>inserted</b> and <b>failed</b>, with Weaviate's exact error and the line number for each failure &mdash; one bad row never aborts the rest.</li>
+  </ol>
+</div>
+
+<div class="chapter">
+  <h2>11&ensp;The GraphQL console</h2>
+  <img class="screenshot" src="shots/12-console.png" alt="GraphQL console">
+  <p class="caption">The console: query on the left, pretty-printed response on the right.</p>
+  <p>For anything the UI doesn't cover &mdash; nested filter logic, Explore queries, custom _additional fields &mdash; use the raw console.</p>
+  <ol class="steps">
+    <li>From the Schema page, click <b>Console</b>.</li>
+    <li>Write any Weaviate GraphQL query (<code>Get</code>, <code>Aggregate</code>, <code>Explore</code>). Press <kbd>Ctrl</kbd>+<kbd>Enter</kbd> or click <b>Run</b>.</li>
+    <li>The full response envelope renders on the right &mdash; including Weaviate's own error messages, exactly as sent.</li>
+    <li>Your query buffer is saved in the browser per instance, so it survives reloads.</li>
+  </ol>
+  <div class="note">The console is <b>always safe</b>: Weaviate's GraphQL API is query-only (all writes go over REST), so the console works even in read-only deployments.</div>
+</div>
+
+<div class="chapter">
+  <h2>12&ensp;Multi-tenancy</h2>
+  <img class="screenshot" src="shots/13-tenants.png" alt="Tenants page">
+  <p class="caption">The Tenants tab: activity status and per-tenant object counts, with activate/deactivate actions.</p>
+  <p>Multi-tenant collections isolate each tenant's data in its own shard. Weft treats tenants as first-class citizens.</p>
+  <ol class="steps">
+    <li>On a multi-tenant collection (badge on its detail page), open the <b>Tenants</b> tab.</li>
+    <li>The table lists every tenant, its status (<b>HOT</b> = active/queryable, <b>COLD</b> = deactivated, frees memory) and its object count.</li>
+    <li><b>Create tenants</b>: enter one or more names and confirm.</li>
+    <li><b>Deactivate</b> a tenant to release resources; <b>Activate</b> restores it. Data is preserved either way.</li>
+    <li>Click <b>Browse</b> on a HOT tenant to open the object explorer scoped to that tenant &mdash; the tenant field is pre-filled, and search/filters/import all respect it.</li>
+  </ol>
+  <div class="note">When browsing a multi-tenant collection you must set the tenant field (top right of the explorer) &mdash; Weaviate requires it for every data operation on such collections.</div>
+</div>
+
+<div class="chapter">
+  <h2>13&ensp;Operations: cluster health, backups &amp; RBAC</h2>
+  <img class="screenshot" src="shots/14-ops.png" alt="Ops page — node health and backups">
+  <p class="caption">The Ops page (top): node health cards, the shard table and capabilities.</p>
+  <img class="screenshot" src="shots/14-ops-b.png" alt="Ops page — statistics and RBAC">
+  <p class="caption">The Ops page (bottom): backups, Raft cluster statistics and the access-control panel.</p>
+  <h3>Node &amp; shard health</h3>
+  <ol class="steps">
+    <li>From the Schema page, click <b>Ops</b>. Node cards show status, version and totals; the shard table breaks down objects per shard (including per-tenant shards). The view refreshes every 10&nbsp;seconds.</li>
+  </ol>
+  <h3>Backups</h3>
+  <ol class="steps">
+    <li>The Backups section appears when the instance has a backup module enabled (<code>backup-filesystem</code>, <code>backup-s3</code>, <code>backup-gcs</code> or <code>backup-azure</code>).</li>
+    <li>Click <b>Create backup</b> to snapshot all collections to the configured backend; the list shows each backup's status (STARTED &rarr; SUCCESS).</li>
+    <li><b>Restore</b> brings a backup's collections back. Weaviate refuses to overwrite collections that still exist &mdash; restore is for recovering deleted data or seeding a fresh instance.</li>
+  </ol>
+  <h3>Cluster statistics</h3>
+  <p>The statistics card shows the Raft consensus state: whether the cluster is <b>synchronized</b>, which node is the <b>leader</b>, and each node's health &mdash; the first thing to check when a multi-node cluster misbehaves.</p>
+  <h3>Access control (RBAC)</h3>
+  <p>If the instance runs with RBAC enabled and Weft's key may read it, this panel lists every <b>role</b> (with its permission count) and every <b>user</b> with their assigned roles. On instances without RBAC the panel says so honestly &mdash; nothing to configure.</p>
+</div>
+
+<div class="chapter">
+  <h2>14&ensp;Comparing schemas (diff)</h2>
+  <img class="screenshot" src="shots/15-diff.png" alt="Schema diff">
+  <p class="caption">The diff page: compare this instance's schema against another instance or a pasted export.</p>
+  <ol class="steps">
+    <li>From the Schema page, click <b>Compare&hellip;</b>.</li>
+    <li>Choose the comparison target: <b>another registered instance</b> (drift between staging and production) or <b>pasted JSON</b> (an earlier Export JSON &mdash; drift over time).</li>
+    <li>The result lists every difference: added/removed collections, added/removed properties, and changed fields with their left/right values.</li>
+  </ol>
+</div>
+
+<div class="chapter">
+  <h2>15&ensp;Configuration reference</h2>
+  <table>
+    <tr><th>Variable</th><th>Default</th><th>Purpose</th></tr>
+    <tr><td><code>WEAVIATE_URL</code></td><td><code>http://weaviate:8080</code></td><td>URL of the default (<code>local</code>) instance</td></tr>
+    <tr><td><code>WEAVIATE_API_KEY</code></td><td>&mdash;</td><td>API key for the default instance</td></tr>
+    <tr><td><code>WEFT_LISTEN</code></td><td><code>0.0.0.0:8080</code></td><td>Address Weft binds</td></tr>
+    <tr><td><code>WEFT_AUTH_TOKEN</code></td><td>&mdash; (open)</td><td>Require this token for all API access (chapter 3)</td></tr>
+    <tr><td><code>WEFT_READ_ONLY</code></td><td><code>false</code></td><td>Reject every mutation; UI hides write controls</td></tr>
+    <tr><td><code>WEFT_INSTANCES_FILE</code></td><td>&mdash; (in-memory)</td><td>Persist runtime-added instances to this JSON file</td></tr>
+    <tr><td><code>RUST_LOG</code></td><td><code>info</code></td><td>Log level</td></tr>
+  </table>
+  <h3>weft.yaml &mdash; permanent multi-instance config</h3>
+  <p>Mount a <code>weft.yaml</code> at <code>/app/weft.yaml</code> to define permanent instances:</p>
+<pre><code>listen: "0.0.0.0:8080"
+instances:
+  - id: local
+    name: Local Weaviate
+    url: http://weaviate:8080
+  - id: staging
+    name: Staging cluster
+    url: https://weaviate.staging.example.com
+    api_key: "sk-..."</code></pre>
+  <div class="warn">API keys in <code>weft.yaml</code> and in the instances file are stored in plain text &mdash; protect those volumes. Keys are never shown in the UI or API responses.</div>
+  <h3>Upgrades</h3>
+  <p>Weft is stateless: upgrading is <code>docker pull</code> + recreate. Your Weaviate data is never touched. The <code>/api/v1</code> HTTP API is stable across all 1.x releases (additive changes only). Pin at least the minor tag (<code>ghcr.io/compufreq/weft:1.0</code>) in production.</p>
+</div>
+
+<div class="chapter">
+  <h2>16&ensp;Troubleshooting</h2>
+  <table>
+    <tr><th>Symptom</th><th>Likely cause &amp; fix</th></tr>
+    <tr><td>&ldquo;Could not load schema&rdquo; / 502 errors</td><td>Weft can't reach the Weaviate URL. From inside Docker, <code>localhost</code> refers to the Weft container itself &mdash; use the service name (<code>http://weaviate:8080</code>) or <code>host.docker.internal</code>.</td></tr>
+    <tr><td>Browsing a collection returns an error about tenants</td><td>The collection is multi-tenant: set the tenant field (top right of the explorer) first.</td></tr>
+    <tr><td>nearText returns an error</td><td>The collection has no vectorizer module. Use BM25, hybrid or nearVector instead.</td></tr>
+    <tr><td>&ldquo;Too many attempts &mdash; try again in &hellip;s&rdquo;</td><td>The login rate limit (5/minute per IP). Wait for the countdown, then retry with the correct token.</td></tr>
+    <tr><td>Buttons like New object / Import are missing</td><td>The deployment runs in read-only mode, or your session is on a read-only instance of Weft. This is by design.</td></tr>
+    <tr><td>Aliases panel says they need Weaviate &ge; 1.32</td><td>Your Weaviate is older. Upgrade Weaviate, or ignore &mdash; everything else works.</td></tr>
+    <tr><td>Import reports failures</td><td>Read the per-item message: usually a property value that doesn't match the schema type (e.g. text where an int is expected). Fix those lines and re-import them.</td></tr>
+    <tr><td>Instances added in the UI vanish after restart</td><td>Persistence isn't enabled. Set <code>WEFT_INSTANCES_FILE</code> with a volume (chapter 2), or define instances in <code>weft.yaml</code>.</td></tr>
+    <tr><td>Vector map says no vectors found</td><td>Objects were inserted without vectors and the collection has no vectorizer. The map needs stored vectors.</td></tr>
+  </table>
+  <h3>Getting help</h3>
+  <p>Documentation: <b>compufreq.github.io/weft</b> &middot; Issues &amp; feature requests: <b>github.com/compufreq/weft/issues</b> &middot; Security reports: see <b>SECURITY.md</b> in the repository.</p>
+</div>
+
+</body>
+</html>

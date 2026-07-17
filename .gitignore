@@ -38,3 +38,7 @@ Thumbs.db
 # --- Logs / temp ---
 *.log
 .cache/
+
+# generated manual artifacts
+Weft-User-Manual.pdf
+manual/shots/
