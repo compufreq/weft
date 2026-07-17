@@ -58,16 +58,7 @@ impl SessionRateLimiter {
     }
 }
 
-/// Constant-time string comparison (length leaks, contents don't).
-fn ct_eq(a: &str, b: &str) -> bool {
-    if a.len() != b.len() {
-        return false;
-    }
-    a.bytes()
-        .zip(b.bytes())
-        .fold(0u8, |acc, (x, y)| acc | (x ^ y))
-        == 0
-}
+use crate::auth_backend::{ct_eq, Actor, MutationEvent};
 
 fn cookie_token(headers: &HeaderMap) -> Option<String> {
     let cookies = headers.get(header::COOKIE)?.to_str().ok()?;
@@ -86,12 +77,17 @@ fn presented_token(headers: &HeaderMap) -> Option<String> {
     bearer_token(headers).or_else(|| cookie_token(headers))
 }
 
-fn authorized(state: &AppState, headers: &HeaderMap) -> bool {
-    match &state.auth_token {
-        None => true,
-        Some(expected) => presented_token(headers)
-            .is_some_and(|presented| ct_eq(&presented, expected.expose_secret())),
+/// Resolve the caller via the configured [`crate::auth_backend::AuthBackend`]:
+/// `Some(actor)` when the request may proceed, `None` when unauthorized.
+fn authenticate(state: &AppState, headers: &HeaderMap) -> Option<Actor> {
+    if !state.auth_backend.required() {
+        return Some(Actor::anonymous());
     }
+    presented_token(headers).and_then(|presented| state.auth_backend.verify(&presented))
+}
+
+fn authorized(state: &AppState, headers: &HeaderMap) -> bool {
+    authenticate(state, headers).is_some()
 }
 
 /// POST endpoints that never mutate anything: search/diff/aggregate are pure
@@ -105,24 +101,28 @@ fn is_read_safe_post(path: &str) -> bool {
         || path.ends_with("/graphql")
 }
 
-/// Middleware: enforce auth + read-only on `/api` routes.
+/// Middleware: enforce auth + read-only on `/api` routes, and report
+/// successful mutations to the [`crate::auth_backend::MutationHook`].
 pub async fn guard(State(state): State<AppState>, req: Request, next: Next) -> Response {
-    let path = req.uri().path();
+    let path = req.uri().path().to_string();
+    let method = req.method().clone();
 
     // Only the API is guarded; probes and the SSR shell pass through.
     let is_api = path.starts_with("/api/");
     let is_auth_endpoint = path == "/api/v1/auth" || path == "/api/v1/auth/session";
 
+    let mut actor: Option<Actor> = None;
+    let mut is_mutation = false;
     if is_api && !is_auth_endpoint {
-        if !authorized(&state, req.headers()) {
+        let Some(caller) = authenticate(&state, req.headers()) else {
             return (
                 StatusCode::UNAUTHORIZED,
                 Json(json!({ "error": { "code": "unauthorized", "message": "missing or invalid token" } })),
             )
                 .into_response();
-        }
-        let read_safe = matches!(*req.method(), Method::GET | Method::HEAD | Method::OPTIONS)
-            || (*req.method() == Method::POST && is_read_safe_post(path));
+        };
+        let read_safe = matches!(method, Method::GET | Method::HEAD | Method::OPTIONS)
+            || (method == Method::POST && is_read_safe_post(&path));
         if state.read_only && !read_safe {
             return (
                 StatusCode::FORBIDDEN,
@@ -130,15 +130,32 @@ pub async fn guard(State(state): State<AppState>, req: Request, next: Next) -> R
             )
                 .into_response();
         }
+        actor = Some(caller);
+        is_mutation = !read_safe;
     }
 
-    next.run(req).await
+    let response = next.run(req).await;
+
+    // Report successful mutations. Failures are deliberately not reported:
+    // the hook's contract is "this happened", not "this was attempted".
+    if is_mutation && response.status().is_success() {
+        if let (Some(hook), Some(actor)) = (&state.mutation_hook, actor) {
+            hook(&MutationEvent {
+                actor: actor.id,
+                method: method.to_string(),
+                path,
+                status: response.status().as_u16(),
+            });
+        }
+    }
+
+    response
 }
 
 /// `GET /api/v1/auth` — auth status for the UI gate (never guarded).
 pub async fn status(State(state): State<AppState>, headers: HeaderMap) -> Json<serde_json::Value> {
     Json(json!({
-        "auth_required": state.auth_token.is_some(),
+        "auth_required": state.auth_backend.required(),
         "authorized": authorized(&state, &headers),
         "read_only": state.read_only,
     }))
@@ -205,15 +222,6 @@ pub async fn logout() -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn ct_eq_matches_only_exact() {
-        assert!(ct_eq("secret", "secret"));
-        assert!(!ct_eq("secret", "secret2"));
-        assert!(!ct_eq("secret", "secreT"));
-        assert!(!ct_eq("", "x"));
-        assert!(ct_eq("", ""));
-    }
 
     #[test]
     fn cookie_parsing_finds_weft_token() {

@@ -4,11 +4,13 @@
 //! router in-process.
 
 pub mod api;
+pub mod auth_backend;
 pub mod error;
 pub mod proxy;
 pub mod state;
 pub mod supervisor;
 
+pub use auth_backend::{Actor, AuthBackend, MutationEvent, MutationHook, SharedTokenBackend};
 pub use proxy::SsrProxy;
 pub use state::AppState;
 

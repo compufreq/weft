@@ -1,6 +1,7 @@
 //! Application state: the registry of configured Weaviate instances.
 
 use crate::api::auth::SessionRateLimiter;
+use crate::auth_backend::{AuthBackend, MutationHook, SharedTokenBackend};
 use dashmap::{DashMap, DashSet};
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
@@ -41,7 +42,7 @@ struct PersistedInstance {
 }
 
 /// Shared application state. Cheap to clone.
-#[derive(Debug, Clone, Default)]
+#[derive(Clone)]
 pub struct AppState {
     instances: Arc<DashMap<String, Arc<Instance>>>,
     /// Ids added at runtime (as opposed to config) — these are what
@@ -50,11 +51,45 @@ pub struct AppState {
     /// When set, runtime instances survive restarts via this JSON file.
     instances_file: Option<Arc<PathBuf>>,
     /// When set, the API guard requires this token (Bearer or cookie).
+    /// Kept alongside `auth_backend` because the cookie-session exchange
+    /// (`POST /api/v1/auth/session`) is shared-token-specific.
     pub auth_token: Option<SecretString>,
+    /// Verifies presented credentials; the built-in shared-token backend
+    /// by default. Extension seam for alternative auth (v1.4+).
+    pub auth_backend: Arc<dyn AuthBackend>,
+    /// Called after every successful mutating API request. `None` = no-op.
+    /// Extension seam for audit sinks (v1.4+).
+    pub mutation_hook: Option<MutationHook>,
     /// When true, mutating API requests are rejected.
     pub read_only: bool,
     /// Per-IP rate limiter for `POST /api/v1/auth/session`.
     pub session_limiter: Arc<SessionRateLimiter>,
+}
+
+impl Default for AppState {
+    fn default() -> Self {
+        Self {
+            instances: Arc::default(),
+            runtime_ids: Arc::default(),
+            instances_file: None,
+            auth_token: None,
+            auth_backend: Arc::new(SharedTokenBackend::default()),
+            mutation_hook: None,
+            read_only: false,
+            session_limiter: Arc::default(),
+        }
+    }
+}
+
+impl std::fmt::Debug for AppState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AppState")
+            .field("instances", &self.instances.len())
+            .field("auth_backend", &self.auth_backend)
+            .field("mutation_hook", &self.mutation_hook.is_some())
+            .field("read_only", &self.read_only)
+            .finish_non_exhaustive()
+    }
 }
 
 impl AppState {
@@ -63,6 +98,7 @@ impl AppState {
     pub fn from_config(config: &Config) -> Result<Self, weft_weaviate::Error> {
         let state = Self {
             auth_token: config.auth_token.clone(),
+            auth_backend: Arc::new(SharedTokenBackend::new(config.auth_token.clone())),
             read_only: config.read_only,
             instances_file: config
                 .instances_file
@@ -219,5 +255,21 @@ impl AppState {
 
     pub fn instance_count(&self) -> usize {
         self.instances.len()
+    }
+
+    /// Replace the auth backend (extension seam — the built-in shared-token
+    /// backend stays the default).
+    #[must_use]
+    pub fn with_auth_backend(mut self, backend: Arc<dyn AuthBackend>) -> Self {
+        self.auth_backend = backend;
+        self
+    }
+
+    /// Install a mutation hook, called after every successful mutating API
+    /// request (extension seam for audit sinks — no-op by default).
+    #[must_use]
+    pub fn with_mutation_hook(mut self, hook: MutationHook) -> Self {
+        self.mutation_hook = Some(hook);
+        self
     }
 }
