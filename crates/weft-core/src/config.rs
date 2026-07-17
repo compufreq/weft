@@ -82,10 +82,26 @@ impl From<figment::Error> for ConfigError {
 impl Config {
     /// Load configuration: defaults < `weft.yaml` < `WEFT_*` env vars.
     pub fn load() -> Result<Self, ConfigError> {
-        Ok(Figment::from(Serialized::defaults(Config::default()))
+        let mut config: Self = Figment::from(Serialized::defaults(Config::default()))
             .merge(Yaml::file("weft.yaml"))
             .merge(Env::prefixed("WEFT_").split("__"))
-            .extract()?)
+            .extract()?;
+        // `api_key` is #[serde(skip_serializing)] (so it can never leak into
+        // an API response), which also drops it from figment's serialized
+        // defaults layer — re-apply $WEAVIATE_API_KEY to the default `local`
+        // instance after extraction. Explicit weft.yaml keys still win.
+        if let Ok(key) = std::env::var("WEAVIATE_API_KEY") {
+            if !key.is_empty() {
+                if let Some(local) = config
+                    .instances
+                    .iter_mut()
+                    .find(|i| i.id == "local" && i.api_key.is_none())
+                {
+                    local.api_key = Some(SecretString::from(key));
+                }
+            }
+        }
+        Ok(config)
     }
 }
 
@@ -99,6 +115,19 @@ mod tests {
         assert_eq!(cfg.listen, "0.0.0.0:8080");
         assert_eq!(cfg.instances.len(), 1);
         assert_eq!(cfg.instances[0].id, "local");
+    }
+
+    #[test]
+    fn weaviate_api_key_env_survives_figment_load() {
+        // Regression: skip_serializing dropped the env key from figment's
+        // defaults layer — WEAVIATE_API_KEY silently never reached the
+        // client in any release ≤ 1.3.0. nextest runs each test in its own
+        // process, so setting the var here cannot race other tests.
+        std::env::set_var("WEAVIATE_API_KEY", "env-secret-key");
+        let cfg = Config::load().expect("load");
+        let local = cfg.instances.iter().find(|i| i.id == "local").unwrap();
+        assert!(local.api_key.is_some(), "env API key must survive load()");
+        std::env::remove_var("WEAVIATE_API_KEY");
     }
 
     #[test]
