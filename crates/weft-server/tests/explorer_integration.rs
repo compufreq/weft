@@ -272,6 +272,78 @@ async fn filtered_browse_pages_by_offset() {
 }
 
 #[tokio::test]
+async fn filtered_browse_supports_or_and_nested_groups() {
+    // science (6) OR sports (6) → 12 of the 25 seeded articles.
+    let filter = serde_json::json!({
+        "operator": "Or",
+        "conditions": [
+            { "path": "category", "operator": "Equal", "value": "science" },
+            { "path": "category", "operator": "Equal", "value": "sports" }
+        ]
+    })
+    .to_string();
+    let (status, body) = get(&format!(
+        "/api/v1/instances/local/collections/Article/objects?limit=50&where={}",
+        url_encode(&filter)
+    ))
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let objects = body["objects"].as_array().unwrap();
+    assert_eq!(objects.len(), 12, "{body}");
+    assert!(objects.iter().all(|o| {
+        let c = &o["properties"]["category"];
+        c == "science" || c == "sports"
+    }));
+
+    // Nested: (science OR sports) AND wordCount < 100.
+    // Seeded wordCount = 40 + i*7 → matches are 47, 61, 75, 89.
+    let filter = serde_json::json!({
+        "conditions": [
+            { "path": "wordCount", "operator": "LessThan", "value": 100 }
+        ],
+        "groups": [{
+            "operator": "Or",
+            "conditions": [
+                { "path": "category", "operator": "Equal", "value": "science" },
+                { "path": "category", "operator": "Equal", "value": "sports" }
+            ]
+        }]
+    })
+    .to_string();
+    let (status, body) = get(&format!(
+        "/api/v1/instances/local/collections/Article/objects?limit=50&where={}",
+        url_encode(&filter)
+    ))
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["objects"].as_array().unwrap().len(), 4, "{body}");
+}
+
+#[tokio::test]
+async fn filtered_browse_rejects_too_deep_nesting() {
+    // Chain 6 groups (top level is depth 1, cap is 5) → clean 422.
+    let mut filter = serde_json::json!({
+        "conditions": [{ "path": "category", "operator": "Equal", "value": "tech" }]
+    });
+    for _ in 0..5 {
+        filter = serde_json::json!({ "conditions": [], "groups": [filter] });
+    }
+    let (status, body) = get(&format!(
+        "/api/v1/instances/local/collections/Article/objects?where={}",
+        url_encode(&filter.to_string())
+    ))
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+    assert!(
+        body["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("nest at most"),
+        "{body}"
+    );
+}
+
+#[tokio::test]
 async fn filtered_browse_rejects_bad_filters() {
     // Malformed JSON → 422.
     let (status, body) =

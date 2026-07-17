@@ -1,6 +1,15 @@
 import { render, screen, fireEvent } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
-import FilterBuilder, { operatorsFor, rowValue, valueTypeFor, type FilterRow } from "./FilterBuilder";
+import FilterBuilder, {
+  countRows,
+  emptyGroup,
+  operatorsFor,
+  rowValue,
+  toWhereFilter,
+  valueTypeFor,
+  type FilterGroup,
+  type FilterRow,
+} from "./FilterBuilder";
 import type { Property } from "~/lib/api";
 
 const props: Property[] = [
@@ -8,6 +17,11 @@ const props: Property[] = [
   { name: "wordCount", dataType: ["int"] },
   { name: "published", dataType: ["boolean"] },
 ];
+
+const group = (partial: Partial<FilterGroup>): FilterGroup => ({
+  ...emptyGroup(),
+  ...partial,
+});
 
 describe("FilterBuilder helpers", () => {
   it("maps dataTypes to value types and operators", () => {
@@ -33,18 +47,114 @@ describe("FilterBuilder helpers", () => {
     expect(rowValue(row("IsNull", ""), "text")).toBe(true);
     expect(() => rowValue(row("Equal", "abc"), "int")).toThrow(/not an integer/);
   });
+
+  it("converts a group tree to the API WhereFilter shape", () => {
+    expect(toWhereFilter(emptyGroup(), props)).toBeUndefined();
+
+    const tree = group({
+      combinator: "And",
+      rows: [{ path: "wordCount", operator: "GreaterThan", raw: "10" }],
+      groups: [
+        group({
+          combinator: "Or",
+          rows: [
+            { path: "title", operator: "Equal", raw: "a" },
+            { path: "title", operator: "Equal", raw: "b" },
+          ],
+        }),
+        // Empty subgroup is pruned.
+        emptyGroup("Or"),
+      ],
+    });
+    expect(toWhereFilter(tree, props)).toEqual({
+      operator: "And",
+      conditions: [
+        { path: "wordCount", operator: "GreaterThan", value: 10, value_type: "int" },
+      ],
+      groups: [
+        {
+          operator: "Or",
+          conditions: [
+            { path: "title", operator: "Equal", value: "a", value_type: "text" },
+            { path: "title", operator: "Equal", value: "b", value_type: "text" },
+          ],
+          groups: [],
+        },
+      ],
+    });
+    expect(countRows(tree)).toBe(3);
+  });
 });
 
 describe("FilterBuilder", () => {
   it("adds a row with the first property preselected", () => {
     const onChange = vi.fn();
     render(() => (
-      <FilterBuilder properties={props} rows={[]} onChange={onChange} onApply={vi.fn()} />
+      <FilterBuilder
+        properties={props}
+        group={emptyGroup()}
+        onChange={onChange}
+        onApply={vi.fn()}
+      />
     ));
     fireEvent.click(screen.getByText("+ Add filter"));
-    expect(onChange).toHaveBeenCalledWith([
-      { path: "title", operator: "Equal", raw: "" },
-    ]);
+    expect(onChange).toHaveBeenCalledWith(
+      group({ rows: [{ path: "title", operator: "Equal", raw: "" }] }),
+    );
+  });
+
+  it("adds a subgroup with the opposite combinator", () => {
+    const onChange = vi.fn();
+    render(() => (
+      <FilterBuilder
+        properties={props}
+        group={group({ rows: [{ path: "title", operator: "Like", raw: "*x*" }] })}
+        onChange={onChange}
+        onApply={vi.fn()}
+      />
+    ));
+    fireEvent.click(screen.getByLabelText("Add group"));
+    expect(onChange).toHaveBeenCalledWith(
+      group({
+        rows: [{ path: "title", operator: "Like", raw: "*x*" }],
+        groups: [emptyGroup("Or")],
+      }),
+    );
+  });
+
+  it("shows the match-mode select once there are two operands and switches to OR", () => {
+    const onChange = vi.fn();
+    const two = group({
+      rows: [
+        { path: "title", operator: "Equal", raw: "a" },
+        { path: "title", operator: "Equal", raw: "b" },
+      ],
+    });
+    render(() => (
+      <FilterBuilder properties={props} group={two} onChange={onChange} onApply={vi.fn()} />
+    ));
+    const mode = screen.getByLabelText("Match mode");
+    fireEvent.change(mode, { target: { value: "Or" } });
+    expect(onChange).toHaveBeenCalledWith({ ...two, combinator: "Or" });
+  });
+
+  it("renders nested group rows with scoped labels and removes a group", () => {
+    const onChange = vi.fn();
+    const tree = group({
+      rows: [{ path: "title", operator: "Equal", raw: "a" }],
+      groups: [
+        group({
+          combinator: "Or",
+          rows: [{ path: "wordCount", operator: "GreaterThan", raw: "5" }],
+        }),
+      ],
+    });
+    render(() => (
+      <FilterBuilder properties={props} group={tree} onChange={onChange} onApply={vi.fn()} />
+    ));
+    expect(screen.getByLabelText("Group 1 filter 1 property")).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Remove group 1"));
+    expect(onChange).toHaveBeenCalledWith({ ...tree, groups: [] });
   });
 
   it("applies and clears", () => {
@@ -53,7 +163,7 @@ describe("FilterBuilder", () => {
     render(() => (
       <FilterBuilder
         properties={props}
-        rows={[{ path: "title", operator: "Like", raw: "*x*" }]}
+        group={group({ rows: [{ path: "title", operator: "Like", raw: "*x*" }] })}
         onChange={onChange}
         onApply={onApply}
       />
@@ -61,7 +171,7 @@ describe("FilterBuilder", () => {
     fireEvent.click(screen.getByText("Apply filters"));
     expect(onApply).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByText("Clear"));
-    expect(onChange).toHaveBeenCalledWith([]);
+    expect(onChange).toHaveBeenCalledWith(emptyGroup());
     expect(onApply).toHaveBeenCalledTimes(2);
   });
 
@@ -69,10 +179,12 @@ describe("FilterBuilder", () => {
     render(() => (
       <FilterBuilder
         properties={props}
-        rows={[
-          { path: "title", operator: "IsNull", raw: "" },
-          { path: "published", operator: "Equal", raw: "true" },
-        ]}
+        group={group({
+          rows: [
+            { path: "title", operator: "IsNull", raw: "" },
+            { path: "published", operator: "Equal", raw: "true" },
+          ],
+        })}
         onChange={vi.fn()}
         onApply={vi.fn()}
       />
@@ -87,17 +199,19 @@ describe("FilterBuilder", () => {
     render(() => (
       <FilterBuilder
         properties={props}
-        rows={[
-          { path: "title", operator: "Equal", raw: "a" },
-          { path: "wordCount", operator: "GreaterThan", raw: "5" },
-        ]}
+        group={group({
+          rows: [
+            { path: "title", operator: "Equal", raw: "a" },
+            { path: "wordCount", operator: "GreaterThan", raw: "5" },
+          ],
+        })}
         onChange={onChange}
         onApply={vi.fn()}
       />
     ));
     fireEvent.click(screen.getByLabelText("Remove filter 1"));
-    expect(onChange).toHaveBeenCalledWith([
-      { path: "wordCount", operator: "GreaterThan", raw: "5" },
-    ]);
+    expect(onChange).toHaveBeenCalledWith(
+      group({ rows: [{ path: "wordCount", operator: "GreaterThan", raw: "5" }] }),
+    );
   });
 });

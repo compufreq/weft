@@ -1778,7 +1778,7 @@ dependencies = [
 
 [[package]]
 name = "weft-core"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "figment",
  "secrecy",
@@ -1790,7 +1790,7 @@ dependencies = [
 
 [[package]]
 name = "weft-server"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -1814,7 +1814,7 @@ dependencies = [
 
 [[package]]
 name = "weft-weaviate"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "reqwest",
  "secrecy",
@@ -1945,7 +1945,7 @@ checksum = "1ffae5123b2d3fc086436f8834ae3ab053a283cfac8fe0a0b8eaae044768a4c4"
 
 [[package]]
 name = "xtask"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "serde_json",

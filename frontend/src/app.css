@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* Class-strategy dark mode: the inline head script (entry-server) sets
+   `.dark` on <html> from the stored preference, falling back to the OS
+   `prefers-color-scheme` — so `dark:` utilities keep working for
+   OS-preference users while the nav toggle can override. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   /* Weft brand accent — indigo family, works in light and dark. */
   --color-weft-50: oklch(0.96 0.02 285);

@@ -5,9 +5,9 @@ import AggregatePanel from "~/components/explorer/AggregatePanel";
 import ImportPanel from "~/components/explorer/ImportPanel";
 import ObjectEditor from "~/components/explorer/ObjectEditor";
 import FilterBuilder, {
-  rowValue,
-  valueTypeFor,
-  type FilterRow,
+  emptyGroup,
+  toWhereFilter,
+  type FilterGroup,
 } from "~/components/explorer/FilterBuilder";
 import ObjectsTable from "~/components/explorer/ObjectsTable";
 import SearchResults from "~/components/explorer/SearchResults";
@@ -46,26 +46,11 @@ export default function ObjectsPage() {
 
   // --- filter state (shared by browse, search, aggregate) ---
   const [properties, setProperties] = createSignal<Property[]>([]);
-  const [filterRows, setFilterRows] = createSignal<FilterRow[]>([]);
+  const [filterGroup, setFilterGroup] = createSignal<FilterGroup>(emptyGroup());
 
-  /** Rows → typed filter, or undefined when no filters. Throws on bad input. */
-  const buildFilter = (): WhereFilter | undefined => {
-    const rows = filterRows();
-    if (rows.length === 0) return undefined;
-    return {
-      conditions: rows.map((row) => {
-        const vtype = valueTypeFor(
-          properties().find((p) => p.name === row.path)?.dataType[0],
-        );
-        return {
-          path: row.path,
-          operator: row.operator,
-          value: rowValue(row, vtype),
-          value_type: vtype,
-        };
-      }),
-    };
-  };
+  /** Group tree → typed filter, or undefined when empty. Throws on bad input. */
+  const buildFilter = (): WhereFilter | undefined =>
+    toWhereFilter(filterGroup(), properties());
 
   // --- browse state: accumulated pages ---
   const [objects, setObjects] = createSignal<WeaviateObject[]>([]);
@@ -406,8 +391,8 @@ export default function ObjectsPage() {
       <div class="mt-4">
         <FilterBuilder
           properties={properties()}
-          rows={filterRows()}
-          onChange={setFilterRows}
+          group={filterGroup()}
+          onChange={setFilterGroup}
           onApply={() => {
             if (mode() === "browse") void loadPage(true);
           }}
@@ -579,6 +564,7 @@ export default function ObjectsPage() {
 
             <Match when={mode() === "import"}>
               <ImportPanel
+                properties={properties()}
                 onImport={(objects) =>
                   api
                     .importObjects(instanceId(), className(), {

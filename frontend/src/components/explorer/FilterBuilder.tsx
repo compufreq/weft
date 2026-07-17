@@ -1,11 +1,38 @@
 import { For, Show } from "solid-js";
-import type { FilterValueType, Property, WhereOperator } from "~/lib/api";
+import type {
+  FilterCombinator,
+  FilterValueType,
+  Property,
+  WhereFilter,
+  WhereOperator,
+} from "~/lib/api";
 
 /** One editable filter row: raw text value, converted on submit. */
 export interface FilterRow {
   path: string;
   operator: WhereOperator;
   raw: string;
+}
+
+/** An editable group: rows + nested groups combined with one operator. */
+export interface FilterGroup {
+  combinator: FilterCombinator;
+  rows: FilterRow[];
+  groups: FilterGroup[];
+}
+
+/** Deepest group nesting the UI offers (the server caps at 5). */
+export const MAX_GROUP_DEPTH = 3;
+
+export const emptyGroup = (combinator: FilterCombinator = "And"): FilterGroup => ({
+  combinator,
+  rows: [],
+  groups: [],
+});
+
+/** Total condition rows across the whole tree. */
+export function countRows(group: FilterGroup): number {
+  return group.rows.length + group.groups.reduce((n, g) => n + countRows(g), 0);
 }
 
 const TEXT_OPS: WhereOperator[] = ["Equal", "NotEqual", "Like", "ContainsAny", "IsNull"];
@@ -74,114 +101,248 @@ export function rowValue(row: FilterRow, vtype: FilterValueType): unknown {
 }
 
 /**
- * Structured where-filter rows (flat AND). Property + operator dropdowns are
- * driven by the collection's schema so value types always match.
+ * Convert an editable group tree into the API's `WhereFilter` shape.
+ * Empty groups are pruned; returns undefined when nothing is set.
+ * Throws on unparsable values (bad numbers).
  */
-export default function FilterBuilder(props: {
+export function toWhereFilter(
+  group: FilterGroup,
+  properties: Property[],
+): WhereFilter | undefined {
+  const conditions = group.rows.map((row) => {
+    const vtype = valueTypeFor(
+      properties.find((p) => p.name === row.path)?.dataType[0],
+    );
+    return {
+      path: row.path,
+      operator: row.operator,
+      value: rowValue(row, vtype),
+      value_type: vtype,
+    };
+  });
+  const groups = group.groups
+    .map((g) => toWhereFilter(g, properties))
+    .filter((g): g is WhereFilter => g !== undefined);
+  if (conditions.length === 0 && groups.length === 0) return undefined;
+  return { conditions, operator: group.combinator, groups };
+}
+
+const inputClass =
+  "rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900";
+
+/** One group's rows, nested groups, and controls. Recursive. */
+function GroupEditor(props: {
   properties: Property[];
-  rows: FilterRow[];
-  onChange: (rows: FilterRow[]) => void;
-  onApply: () => void;
-  disabled?: boolean;
+  group: FilterGroup;
+  onChange: (group: FilterGroup) => void;
+  /** "" for the root; "1", "1.2", … for nested groups. */
+  path: string;
+  depth: number;
 }) {
-  const update = (i: number, patch: Partial<FilterRow>) => {
-    props.onChange(props.rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
-  };
+  const rowLabel = (i: number) =>
+    props.path ? `Group ${props.path} filter ${i + 1}` : `Filter ${i + 1}`;
+  const patch = (partial: Partial<FilterGroup>) =>
+    props.onChange({ ...props.group, ...partial });
+  const updateRow = (i: number, partial: Partial<FilterRow>) =>
+    patch({
+      rows: props.group.rows.map((r, j) => (j === i ? { ...r, ...partial } : r)),
+    });
   const propType = (path: string) =>
     props.properties.find((p) => p.name === path)?.dataType[0];
 
   const addRow = () => {
     const first = props.properties[0];
     if (!first) return;
-    props.onChange([
-      ...props.rows,
-      { path: first.name, operator: operatorsFor(first.dataType[0])[0], raw: "" },
-    ]);
+    patch({
+      rows: [
+        ...props.group.rows,
+        { path: first.name, operator: operatorsFor(first.dataType[0])[0], raw: "" },
+      ],
+    });
   };
 
   return (
-    <fieldset class="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-      <legend class="px-1 text-xs font-medium text-zinc-500 dark:text-zinc-400">
-        Filters (AND)
-      </legend>
-      <div class="space-y-2">
-        <For each={props.rows}>
-          {(row, i) => (
-            <div class="flex flex-wrap items-center gap-2">
-              <select
-                aria-label={`Filter ${i() + 1} property`}
-                class="rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-                value={row.path}
-                onChange={(e) => {
-                  const path = e.currentTarget.value;
-                  update(i(), { path, operator: operatorsFor(propType(path))[0], raw: "" });
-                }}
-              >
-                <For each={props.properties}>
-                  {(p) => <option value={p.name}>{p.name}</option>}
-                </For>
-              </select>
-              <select
-                aria-label={`Filter ${i() + 1} operator`}
-                class="rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-                value={row.operator}
-                onChange={(e) =>
-                  update(i(), { operator: e.currentTarget.value as WhereOperator })
+    <div class="space-y-2">
+      <Show when={props.group.rows.length + props.group.groups.length > 1}>
+        <select
+          aria-label={props.path ? `Group ${props.path} match mode` : "Match mode"}
+          class={inputClass}
+          value={props.group.combinator}
+          onChange={(e) => patch({ combinator: e.currentTarget.value as FilterCombinator })}
+        >
+          <option value="And">Match all (AND)</option>
+          <option value="Or">Match any (OR)</option>
+        </select>
+      </Show>
+      <For each={props.group.rows}>
+        {(row, i) => (
+          <div class="flex flex-wrap items-center gap-2">
+            <select
+              aria-label={`${rowLabel(i())} property`}
+              class={inputClass}
+              value={row.path}
+              onChange={(e) => {
+                const path = e.currentTarget.value;
+                updateRow(i(), {
+                  path,
+                  operator: operatorsFor(propType(path))[0],
+                  raw: "",
+                });
+              }}
+            >
+              <For each={props.properties}>
+                {(p) => <option value={p.name}>{p.name}</option>}
+              </For>
+            </select>
+            <select
+              aria-label={`${rowLabel(i())} operator`}
+              class={inputClass}
+              value={row.operator}
+              onChange={(e) =>
+                updateRow(i(), { operator: e.currentTarget.value as WhereOperator })
+              }
+            >
+              <For each={operatorsFor(propType(row.path))}>
+                {(op) => <option value={op}>{op}</option>}
+              </For>
+            </select>
+            <Show when={row.operator !== "IsNull"}>
+              <Show
+                when={valueTypeFor(propType(row.path)) === "boolean"}
+                fallback={
+                  <input
+                    aria-label={`${rowLabel(i())} value`}
+                    placeholder={
+                      row.operator === "ContainsAny" || row.operator === "ContainsAll"
+                        ? "a, b, c"
+                        : "value"
+                    }
+                    class={`w-44 ${inputClass}`}
+                    value={row.raw}
+                    onInput={(e) => updateRow(i(), { raw: e.currentTarget.value })}
+                  />
                 }
               >
-                <For each={operatorsFor(propType(row.path))}>
-                  {(op) => <option value={op}>{op}</option>}
-                </For>
-              </select>
-              <Show when={row.operator !== "IsNull"}>
-                <Show
-                  when={valueTypeFor(propType(row.path)) === "boolean"}
-                  fallback={
-                    <input
-                      aria-label={`Filter ${i() + 1} value`}
-                      placeholder={
-                        row.operator === "ContainsAny" || row.operator === "ContainsAll"
-                          ? "a, b, c"
-                          : "value"
-                      }
-                      class="w-44 rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-                      value={row.raw}
-                      onInput={(e) => update(i(), { raw: e.currentTarget.value })}
-                    />
-                  }
+                <select
+                  aria-label={`${rowLabel(i())} value`}
+                  class={inputClass}
+                  value={row.raw || "true"}
+                  onChange={(e) => updateRow(i(), { raw: e.currentTarget.value })}
                 >
-                  <select
-                    aria-label={`Filter ${i() + 1} value`}
-                    class="rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-                    value={row.raw || "true"}
-                    onChange={(e) => update(i(), { raw: e.currentTarget.value })}
-                  >
-                    <option value="true">true</option>
-                    <option value="false">false</option>
-                  </select>
-                </Show>
+                  <option value="true">true</option>
+                  <option value="false">false</option>
+                </select>
               </Show>
-              <button
-                type="button"
-                aria-label={`Remove filter ${i() + 1}`}
-                onClick={() => props.onChange(props.rows.filter((_, j) => j !== i()))}
-                class="rounded px-2 py-1 text-zinc-400 hover:text-red-600 dark:hover:text-red-400"
-              >
-                ×
-              </button>
+            </Show>
+            <button
+              type="button"
+              aria-label={`Remove ${rowLabel(i()).toLowerCase()}`}
+              onClick={() =>
+                patch({ rows: props.group.rows.filter((_, j) => j !== i()) })
+              }
+              class="rounded px-2 py-1 text-zinc-400 hover:text-red-600 dark:hover:text-red-400"
+            >
+              ×
+            </button>
+          </div>
+        )}
+      </For>
+      <For each={props.group.groups}>
+        {(sub, k) => {
+          const subPath = props.path ? `${props.path}.${k() + 1}` : `${k() + 1}`;
+          return (
+            <div class="rounded-lg border border-dashed border-zinc-300 p-2 pl-3 dark:border-zinc-700">
+              <div class="mb-1 flex items-center justify-between">
+                <span class="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                  Group {subPath}
+                </span>
+                <button
+                  type="button"
+                  aria-label={`Remove group ${subPath}`}
+                  onClick={() =>
+                    patch({ groups: props.group.groups.filter((_, j) => j !== k()) })
+                  }
+                  class="rounded px-2 py-0.5 text-zinc-400 hover:text-red-600 dark:hover:text-red-400"
+                >
+                  ×
+                </button>
+              </div>
+              <GroupEditor
+                properties={props.properties}
+                group={sub}
+                onChange={(g) =>
+                  patch({
+                    groups: props.group.groups.map((x, j) => (j === k() ? g : x)),
+                  })
+                }
+                path={subPath}
+                depth={props.depth + 1}
+              />
             </div>
-          )}
-        </For>
-        <div class="flex items-center gap-2">
+          );
+        }}
+      </For>
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={addRow}
+          disabled={props.properties.length === 0}
+          class="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium hover:border-weft-400 disabled:opacity-50 dark:border-zinc-700 dark:hover:border-weft-500"
+        >
+          + Add filter
+        </button>
+        <Show when={props.depth < MAX_GROUP_DEPTH}>
           <button
             type="button"
-            onClick={addRow}
+            aria-label={
+              props.path ? `Add group inside group ${props.path}` : "Add group"
+            }
+            onClick={() =>
+              patch({
+                groups: [
+                  ...props.group.groups,
+                  emptyGroup(props.group.combinator === "And" ? "Or" : "And"),
+                ],
+              })
+            }
             disabled={props.properties.length === 0}
             class="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium hover:border-weft-400 disabled:opacity-50 dark:border-zinc-700 dark:hover:border-weft-500"
           >
-            + Add filter
+            + Add group
           </button>
-          <Show when={props.rows.length > 0}>
+        </Show>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Structured where-filter builder: rows and nested groups, each level
+ * combined with AND or OR. Property + operator dropdowns are driven by the
+ * collection's schema so value types always match.
+ */
+export default function FilterBuilder(props: {
+  properties: Property[];
+  group: FilterGroup;
+  onChange: (group: FilterGroup) => void;
+  onApply: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <fieldset class="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+      <legend class="px-1 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+        Filters
+      </legend>
+      <div class="space-y-2">
+        <GroupEditor
+          properties={props.properties}
+          group={props.group}
+          onChange={props.onChange}
+          path=""
+          depth={1}
+        />
+        <Show when={countRows(props.group) > 0}>
+          <div class="flex items-center gap-2">
             <button
               type="button"
               onClick={() => props.onApply()}
@@ -193,15 +354,15 @@ export default function FilterBuilder(props: {
             <button
               type="button"
               onClick={() => {
-                props.onChange([]);
+                props.onChange(emptyGroup());
                 props.onApply();
               }}
               class="text-xs text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
             >
               Clear
             </button>
-          </Show>
-        </div>
+          </div>
+        </Show>
       </div>
     </fieldset>
   );

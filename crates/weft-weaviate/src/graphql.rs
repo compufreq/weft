@@ -34,17 +34,44 @@ pub enum BuildError {
     #[error("filter condition on `{path}`: {reason}")]
     InvalidCondition { path: String, reason: String },
 
-    #[error("a filter needs at least one condition")]
+    #[error("a filter (or group) needs at least one condition")]
     EmptyFilter,
+
+    #[error("filter groups nest at most {MAX_FILTER_DEPTH} levels deep")]
+    TooDeep,
 }
 
-/// A structured `where` filter: a flat AND of conditions.
-///
-/// (Or/nested groups are deliberately out of scope for now — the raw GraphQL
-/// console covers those cases.)
-#[derive(Debug, Clone, Deserialize)]
+/// How a filter combines its conditions and groups.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Default)]
+pub enum Combinator {
+    #[default]
+    And,
+    Or,
+}
+
+impl Combinator {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::And => "And",
+            Self::Or => "Or",
+        }
+    }
+}
+
+/// Maximum nesting depth for filter groups (the top level is depth 1).
+pub const MAX_FILTER_DEPTH: usize = 5;
+
+/// A structured `where` filter: conditions and nested groups combined with
+/// one operator (`And` by default — the original flat shape is unchanged;
+/// `operator`/`groups` are additive per the /api/v1 stability commitment).
+#[derive(Debug, Clone, Deserialize, Default)]
 pub struct WhereFilter {
+    #[serde(default)]
     pub conditions: Vec<Condition>,
+    #[serde(default)]
+    pub operator: Combinator,
+    #[serde(default)]
+    pub groups: Vec<WhereFilter>,
 }
 
 /// One filter condition on a property path.
@@ -180,21 +207,37 @@ impl Condition {
     }
 }
 
+impl WhereFilter {
+    /// Render this filter as one GraphQL operand object, recursing into
+    /// nested groups. A single condition/group collapses to itself (no
+    /// wrapper), which keeps the original flat-AND output byte-identical.
+    fn render(&self, depth: usize) -> Result<String, BuildError> {
+        if depth > MAX_FILTER_DEPTH {
+            return Err(BuildError::TooDeep);
+        }
+        let mut operands: Vec<String> = self
+            .conditions
+            .iter()
+            .map(Condition::render)
+            .collect::<Result<_, _>>()?;
+        for group in &self.groups {
+            operands.push(group.render(depth + 1)?);
+        }
+        match operands.as_slice() {
+            [] => Err(BuildError::EmptyFilter),
+            [single] => Ok(single.clone()),
+            many => Ok(format!(
+                "{{ operator: {}, operands: [{}] }}",
+                self.operator.as_str(),
+                many.join(", ")
+            )),
+        }
+    }
+}
+
 /// Render a `where: {...}` GraphQL argument from a structured filter.
 pub fn where_argument(filter: &WhereFilter) -> Result<String, BuildError> {
-    let rendered: Vec<String> = filter
-        .conditions
-        .iter()
-        .map(Condition::render)
-        .collect::<Result<_, _>>()?;
-    match rendered.as_slice() {
-        [] => Err(BuildError::EmptyFilter),
-        [single] => Ok(format!("where: {single}")),
-        many => Ok(format!(
-            "where: {{ operator: And, operands: [{}] }}",
-            many.join(", ")
-        )),
-    }
+    Ok(format!("where: {}", filter.render(1)?))
 }
 
 /// Validate a Weaviate class/property name for safe GraphQL interpolation.
@@ -440,40 +483,50 @@ mod tests {
         }
     }
 
+    /// The original flat-AND shape.
+    fn flat(conditions: Vec<Condition>) -> WhereFilter {
+        WhereFilter {
+            conditions,
+            ..WhereFilter::default()
+        }
+    }
+
     #[test]
     fn where_single_condition_infers_types() {
-        let f = WhereFilter {
-            conditions: vec![cond("category", WhereOperator::Equal, json!("science"))],
-        };
+        let f = flat(vec![cond(
+            "category",
+            WhereOperator::Equal,
+            json!("science"),
+        )]);
         assert_eq!(
             where_argument(&f).unwrap(),
             r#"where: { path: ["category"], operator: Equal, valueText: "science" }"#
         );
 
-        let f = WhereFilter {
-            conditions: vec![cond("wordCount", WhereOperator::GreaterThan, json!(100))],
-        };
+        let f = flat(vec![cond(
+            "wordCount",
+            WhereOperator::GreaterThan,
+            json!(100),
+        )]);
         assert!(where_argument(&f).unwrap().contains("valueInt: 100"));
 
-        let f = WhereFilter {
-            conditions: vec![cond("price", WhereOperator::LessThanEqual, json!(9.5))],
-        };
+        let f = flat(vec![cond(
+            "price",
+            WhereOperator::LessThanEqual,
+            json!(9.5),
+        )]);
         assert!(where_argument(&f).unwrap().contains("valueNumber: 9.5"));
 
-        let f = WhereFilter {
-            conditions: vec![cond("published", WhereOperator::Equal, json!(true))],
-        };
+        let f = flat(vec![cond("published", WhereOperator::Equal, json!(true))]);
         assert!(where_argument(&f).unwrap().contains("valueBoolean: true"));
     }
 
     #[test]
     fn where_multiple_conditions_are_anded() {
-        let f = WhereFilter {
-            conditions: vec![
-                cond("category", WhereOperator::Equal, json!("science")),
-                cond("wordCount", WhereOperator::GreaterThanEqual, json!(50)),
-            ],
-        };
+        let f = flat(vec![
+            cond("category", WhereOperator::Equal, json!("science")),
+            cond("wordCount", WhereOperator::GreaterThanEqual, json!(50)),
+        ]);
         let w = where_argument(&f).unwrap();
         assert!(w.starts_with("where: { operator: And, operands: ["));
         assert!(w.contains("valueText: \"science\""));
@@ -481,21 +534,103 @@ mod tests {
     }
 
     #[test]
-    fn where_is_null_and_contains_and_date_override() {
+    fn where_or_and_nested_groups() {
+        // Top-level Or of two conditions.
         let f = WhereFilter {
-            conditions: vec![cond("category", WhereOperator::IsNull, json!(null))],
+            conditions: vec![
+                cond("category", WhereOperator::Equal, json!("science")),
+                cond("category", WhereOperator::Equal, json!("tech")),
+            ],
+            operator: Combinator::Or,
+            groups: vec![],
         };
+        let w = where_argument(&f).unwrap();
+        assert!(w.starts_with("where: { operator: Or, operands: ["));
+
+        // AND of one condition and one Or-group.
+        let f = WhereFilter {
+            conditions: vec![cond("wordCount", WhereOperator::GreaterThan, json!(10))],
+            operator: Combinator::And,
+            groups: vec![WhereFilter {
+                conditions: vec![
+                    cond("category", WhereOperator::Equal, json!("science")),
+                    cond("category", WhereOperator::Equal, json!("tech")),
+                ],
+                operator: Combinator::Or,
+                groups: vec![],
+            }],
+        };
+        let w = where_argument(&f).unwrap();
+        assert!(w.starts_with("where: { operator: And, operands: ["));
+        assert!(w.contains("{ operator: Or, operands: ["));
+        assert!(w.contains("valueInt: 10"));
+
+        // A lone single-condition group collapses to the condition itself.
+        let f = WhereFilter {
+            conditions: vec![],
+            operator: Combinator::Or,
+            groups: vec![flat(vec![cond("a", WhereOperator::Equal, json!("x"))])],
+        };
+        assert_eq!(
+            where_argument(&f).unwrap(),
+            r#"where: { path: ["a"], operator: Equal, valueText: "x" }"#
+        );
+    }
+
+    #[test]
+    fn where_group_deserializes_and_flat_json_still_works() {
+        // The pre-1.1 flat JSON shape deserializes unchanged (additive API).
+        let f: WhereFilter = serde_json::from_str(
+            r#"{"conditions":[{"path":"category","operator":"Equal","value":"science"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(f.operator, Combinator::And);
+        assert!(f.groups.is_empty());
+
+        // The nested shape deserializes with operator + groups.
+        let f: WhereFilter = serde_json::from_str(
+            r#"{"operator":"Or","conditions":[],"groups":[{"conditions":[{"path":"a","operator":"Equal","value":1}]},{"conditions":[{"path":"b","operator":"Equal","value":2}]}]}"#,
+        )
+        .unwrap();
+        let w = where_argument(&f).unwrap();
+        assert!(w.starts_with("where: { operator: Or, operands: ["));
+        assert!(w.contains("valueInt: 1") && w.contains("valueInt: 2"));
+    }
+
+    #[test]
+    fn where_depth_cap_and_empty_group_rejected() {
+        // Build a chain nested one past MAX_FILTER_DEPTH.
+        let mut f = flat(vec![cond("a", WhereOperator::Equal, json!("x"))]);
+        for _ in 0..MAX_FILTER_DEPTH {
+            f = WhereFilter {
+                conditions: vec![cond("b", WhereOperator::Equal, json!("y"))],
+                operator: Combinator::And,
+                groups: vec![f],
+            };
+        }
+        assert!(matches!(where_argument(&f), Err(BuildError::TooDeep)));
+
+        // An empty nested group is rejected like an empty filter.
+        let f = WhereFilter {
+            conditions: vec![cond("a", WhereOperator::Equal, json!("x"))],
+            operator: Combinator::And,
+            groups: vec![flat(vec![])],
+        };
+        assert!(matches!(where_argument(&f), Err(BuildError::EmptyFilter)));
+    }
+
+    #[test]
+    fn where_is_null_and_contains_and_date_override() {
+        let f = flat(vec![cond("category", WhereOperator::IsNull, json!(null))]);
         assert!(where_argument(&f)
             .unwrap()
             .contains("operator: IsNull, valueBoolean: true"));
 
-        let f = WhereFilter {
-            conditions: vec![cond(
-                "category",
-                WhereOperator::ContainsAny,
-                json!(["a", "b"]),
-            )],
-        };
+        let f = flat(vec![cond(
+            "category",
+            WhereOperator::ContainsAny,
+            json!(["a", "b"]),
+        )]);
         assert!(where_argument(&f)
             .unwrap()
             .contains(r#"operator: ContainsAny, valueText: ["a","b"]"#));
@@ -506,9 +641,7 @@ mod tests {
             json!("2026-01-01T00:00:00Z"),
         );
         date.value_type = Some(ValueType::Date);
-        let f = WhereFilter {
-            conditions: vec![date],
-        };
+        let f = flat(vec![date]);
         assert!(where_argument(&f)
             .unwrap()
             .contains(r#"valueDate: "2026-01-01T00:00:00Z""#));
@@ -517,34 +650,26 @@ mod tests {
     #[test]
     fn where_rejects_bad_input() {
         // Injection through the path is impossible — idents are validated.
-        let f = WhereFilter {
-            conditions: vec![cond("cat\"] , x", WhereOperator::Equal, json!("x"))],
-        };
+        let f = flat(vec![cond("cat\"] , x", WhereOperator::Equal, json!("x"))]);
         assert!(where_argument(&f).is_err());
 
         // A list needs Contains*, a scalar op rejects lists.
-        let f = WhereFilter {
-            conditions: vec![cond("category", WhereOperator::Equal, json!(["a"]))],
-        };
+        let f = flat(vec![cond("category", WhereOperator::Equal, json!(["a"]))]);
         assert!(where_argument(&f).is_err());
 
         // Null value without IsNull is rejected.
-        let f = WhereFilter {
-            conditions: vec![cond("category", WhereOperator::Equal, json!(null))],
-        };
+        let f = flat(vec![cond("category", WhereOperator::Equal, json!(null))]);
         assert!(where_argument(&f).is_err());
 
         // Empty filter is rejected.
-        assert!(where_argument(&WhereFilter { conditions: vec![] }).is_err());
+        assert!(where_argument(&flat(vec![])).is_err());
 
         // Injection through a string value stays inside the JSON literal.
-        let f = WhereFilter {
-            conditions: vec![cond(
-                "category",
-                WhereOperator::Equal,
-                json!("x\" }] , inject: { "),
-            )],
-        };
+        let f = flat(vec![cond(
+            "category",
+            WhereOperator::Equal,
+            json!("x\" }] , inject: { "),
+        )]);
         assert!(where_argument(&f)
             .unwrap()
             .contains(r#"valueText: "x\" }] , inject: { ""#));
@@ -552,9 +677,11 @@ mod tests {
 
     #[test]
     fn browse_query_with_filter_and_offset() {
-        let f = WhereFilter {
-            conditions: vec![cond("category", WhereOperator::Equal, json!("science"))],
-        };
+        let f = flat(vec![cond(
+            "category",
+            WhereOperator::Equal,
+            json!("science"),
+        )]);
         let q = build_browse("Article", &["title".into()], &f, 25, 50, Some("acme")).unwrap();
         assert!(q.contains("Get { Article(limit: 25, where:"));
         assert!(q.contains("offset: 50"));
@@ -568,9 +695,11 @@ mod tests {
 
     #[test]
     fn aggregate_with_group_by_and_filter() {
-        let f = WhereFilter {
-            conditions: vec![cond("wordCount", WhereOperator::GreaterThan, json!(10))],
-        };
+        let f = flat(vec![cond(
+            "wordCount",
+            WhereOperator::GreaterThan,
+            json!(10),
+        )]);
         let q = build_aggregate("Article", None, Some(&f), Some("category")).unwrap();
         assert!(q.contains(r#"Aggregate { Article(groupBy: ["category"], where:"#));
         assert!(q.contains("groupedBy { path value } meta { count }"));

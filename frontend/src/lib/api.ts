@@ -145,9 +145,17 @@ export interface FilterCondition {
   value_type?: FilterValueType;
 }
 
-/** A flat AND of conditions (the raw console covers Or/nesting). */
+export type FilterCombinator = "And" | "Or";
+
+/**
+ * Conditions and nested groups combined with one operator (`And` when
+ * omitted — the flat shape is the original /api/v1 contract; `operator` and
+ * `groups` are additive in 1.1).
+ */
 export interface WhereFilter {
   conditions: FilterCondition[];
+  operator?: FilterCombinator;
+  groups?: WhereFilter[];
 }
 
 interface SearchCommon {

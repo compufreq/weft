@@ -39,7 +39,7 @@ arm64 image (native GitHub arm runners, multi-arch manifest on GHCR), docs revie
 Where-filter builder on the object browser and search, aggregations (counts + per-property facets), raw GraphQL query console (read-safe: Weaviate's GraphQL API is query-only), read-only-mode fix for non-mutating POST endpoints.
 
 ### v0.10.0 — Data write path *(shipped 2026-07-16)*
-Object create / edit / delete from the UI, JSON/NDJSON batch import with per-item error reports — all blocked in read-only deployments (CSV import: v0.10.x follow-up).
+Object create / edit / delete from the UI, JSON/NDJSON batch import with per-item error reports — all blocked in read-only deployments (CSV import shipped in v1.1.0).
 
 ### v0.11.0 — Schema management & aliases *(shipped 2026-07-16)*
 Collection create (guided form + raw JSON), add property, collection delete behind typed confirmation, collection alias CRUD (Weaviate ≥1.32, graceful degradation below), persisted runtime instances (`WEFT_INSTANCES_FILE`).
@@ -50,5 +50,8 @@ RBAC viewer (roles, users, assignments — read-only, graceful when RBAC is off)
 ### v1.0.0 — Stable *(shipped 2026-07-17)*
 Security review (threat-model page over the full mutation surface), `/api/v1` stability promise, complete documentation.
 
+### v1.1.0 — Explorer & UX upgrades *(shipped 2026-07-17)*
+CSV import (client-side RFC-4180 parsing, schema-typed columns, `id`/`vector` special columns, file picker), AND/OR + nested groups in the filter builder (additive `/api/v1` extension — the flat filter shape is unchanged), dark/light theme toggle with OS-preference fallback.
+
 ### Post-1.0 candidates
-1M-object performance pass · optional gRPC data path · CSV import · Or/nested filter groups · Prometheus metrics & historical charts · RBAC management · AI-assisted operations · open-core identity tier (per-user tokens, SSO/OIDC, audit log).
+1M-object performance pass · optional gRPC data path · Prometheus metrics & historical charts · RBAC management · AI-assisted operations · open-core identity tier (per-user tokens, SSO/OIDC, audit log).
