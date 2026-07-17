@@ -158,7 +158,11 @@ async fn backup_create_completes_and_lists() {
         )
         .await;
         restore = s;
-        if restore["status"] == "FAILED" || restore["status"] == "SUCCESS" {
+        // Weaviate can report FAILED a beat before it fills in the error
+        // message — keep polling until the error text is present too.
+        if restore["status"] == "SUCCESS"
+            || (restore["status"] == "FAILED" && restore["error"].is_string())
+        {
             break;
         }
         tokio::time::sleep(Duration::from_millis(500)).await;
